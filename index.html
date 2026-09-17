@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>分数まどうタワーディフェンス 〜すうじの王国をまもれ！〜</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="game-container">
+    <!-- 1. トップHUDバー -->
+    <header class="top-hud">
+      <div class="flex items-center gap-4 flex-wrap">
+        <!-- ライフ -->
+        <div class="hud-item">
+          <span class="hud-label">ライフ:</span>
+          <span id="livesDisplay" class="lives-value">❤️❤️❤️</span>
+        </div>
+
+        <!-- スコア -->
+        <div class="hud-item">
+          <span class="hud-label">スコア:</span>
+          <span id="scoreDisplay" class="hud-value text-amber-400">0</span>
+        </div>
+
+        <!-- ウェーブ -->
+        <div class="hud-item">
+          <span id="waveDisplay" class="bg-indigo-900/80 border border-indigo-500 text-indigo-200 text-xs px-2.5 py-1 rounded-full font-bold">ウェーブ 1</span>
+        </div>
+
+        <!-- コンボ表示 -->
+        <div id="comboBadge" class="combo-badge hidden">
+          🔥 <span id="comboText">2 連続せいかい！</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <!-- MPゲージ -->
+        <div class="flex items-center gap-1.5" title="必殺技ゲージ: 正解するたびにたまります">
+          <span class="text-xs text-sky-300 font-bold">MP:</span>
+          <div class="mp-container">
+            <div id="mpBar" class="mp-bar"></div>
+          </div>
+          <span id="mpText" class="text-xs font-mono font-bold text-sky-200">0%</span>
+        </div>
+
+        <!-- 計算メモボタン -->
+        <button id="toggleScratchBtn" class="bg-slate-700 hover:bg-slate-600 active:scale-95 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-500 flex items-center gap-1" title="画面上に手書きで計算できるメモを開く">
+          📝 <span class="hidden sm:inline">計算メモ</span>
+        </button>
+
+        <!-- ガイドボタン -->
+        <button id="guideBtn" class="bg-slate-700 hover:bg-slate-600 active:scale-95 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-500 flex items-center gap-1" title="通分・約分のやり方とコツを見る">
+          📖 <span class="hidden sm:inline">コツ</span>
+        </button>
+
+        <!-- サウンド切替 -->
+        <button id="soundToggleBtn" class="bg-slate-700 hover:bg-slate-600 active:scale-95 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg border border-slate-500">
+          🔊 <span class="hidden sm:inline">サウンドON</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 2. バトルフィールド（Canvas） -->
+    <div class="canvas-wrapper">
+      <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <!-- 3. コマンドデッキ（問題・入力エリア） -->
+    <main class="command-deck">
+      <!-- ターゲット問題表示カード -->
+      <section class="problem-card">
+        <div class="w-full flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-500 flex items-center gap-1">
+            🎯 <span class="text-slate-700">ターゲットモンスターの問題:</span>
+          </span>
+          <button id="toggleHintBtn" class="text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-full border border-indigo-200 transition-colors flex items-center gap-1">
+            💡 通分のヒントを見る
+          </button>
+        </div>
+
+        <!-- 問題表示領域 -->
+        <div id="problemArea" class="w-full py-1">
+          <div class="text-slate-400 font-bold text-lg py-3 flex items-center justify-center gap-2">
+            <span class="inline-block animate-spin">🌀</span> 次のモンスターが迫っています...
+          </div>
+        </div>
+
+        <!-- 通分ヒント枠（初期非表示） -->
+        <div id="hintBox" class="hidden w-full bg-amber-50 border border-amber-300 rounded-lg p-2 text-center text-xs font-bold text-amber-800">
+          ✨ <span id="hintText">2 と 3 の最小公倍数は 【 6 】 だよ！</span>
+        </div>
+
+        <!-- フィードバックバナー（診断メッセージ） -->
+        <div id="feedbackBox" class="hidden w-full text-center font-bold px-3 py-1.5 rounded-lg text-xs"></div>
+      </section>
+
+      <!-- 入力欄 & 操作エリア -->
+      <section class="action-grid">
+        <!-- テンキー & 入力フォーム -->
+        <div class="flex flex-col gap-2">
+          <!-- ユーザー解答入力ボックス -->
+          <div class="input-section">
+            <span class="text-sm font-extrabold text-slate-700">あなたの答え:</span>
+
+            <div class="fraction-input-group">
+              <!-- 帯分数：整数部分（トグルで表示） -->
+              <div id="mixedContainer" class="hidden items-center mr-2">
+                <input type="text" id="inputWhole" class="input-box" placeholder="整" readonly inputmode="none">
+                <span class="text-xs font-bold text-slate-500 ml-1">と</span>
+              </div>
+
+              <!-- 分数部分（分子 / 分母） -->
+              <div class="inline-flex flex-col items-center">
+                <input type="text" id="inputNum" class="input-box active" placeholder="分子" readonly inputmode="none">
+                <div class="fraction-bar-divider"></div>
+                <input type="text" id="inputDen" class="input-box" placeholder="分母" readonly inputmode="none">
+              </div>
+            </div>
+
+            <!-- 帯分数切り替えボタン -->
+            <button id="toggleMixedBtn" class="text-xs font-bold bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 px-2.5 py-2 rounded-xl transition-all active:scale-95" title="帯分数（○と△/□）で答える場合はここを押す">
+              帯分数で答える
+            </button>
+          </div>
+
+          <!-- ソフトウェアテンキー -->
+          <div class="numpad-container">
+            <button class="key-btn numpad-btn" data-digit="7">7</button>
+            <button class="key-btn numpad-btn" data-digit="8">8</button>
+            <button class="key-btn numpad-btn" data-digit="9">9</button>
+            <button id="numpadClearBtn" class="key-btn del-key" title="1文字消す">けす ⌫</button>
+
+            <button class="key-btn numpad-btn" data-digit="4">4</button>
+            <button class="key-btn numpad-btn" data-digit="5">5</button>
+            <button class="key-btn numpad-btn" data-digit="6">6</button>
+            <button id="numpadNextBtn" class="key-btn fn-key" title="分子と分母の入力枠を切り替え">切替 ⇄</button>
+
+            <button class="key-btn numpad-btn" data-digit="1">1</button>
+            <button class="key-btn numpad-btn" data-digit="2">2</button>
+            <button class="key-btn numpad-btn" data-digit="3">3</button>
+            <button class="key-btn numpad-btn" data-digit="0">0</button>
+
+            <!-- こうげきボタン（解答決定） -->
+            <button id="attackBtn" class="attack-btn">
+              ⚡ まほうこうげき！ (決定)
+            </button>
+          </div>
+        </div>
+
+        <!-- 必殺技サイドパネル -->
+        <div class="skill-panel">
+          <!-- タイムフリーズ -->
+          <button id="freezeSkillBtn" class="skill-btn freeze opacity-50 cursor-not-allowed" title="消費MP 50: 8秒間モンスターの移動を大幅に遅くする">
+            <span class="text-xl">❄️</span>
+            <span class="font-black">タイムフリーズ</span>
+            <span class="text-[10px] text-sky-100">消費MP 50</span>
+          </button>
+
+          <!-- メテオストライク -->
+          <button id="meteorSkillBtn" class="skill-btn meteor opacity-50 cursor-not-allowed" title="消費MP 100: 最前線のモンスターを一撃で粉砕する">
+            <span class="text-xl">🔥</span>
+            <span class="font-black">メテオボム</span>
+            <span class="text-[10px] text-amber-100">消費MP 100</span>
+          </button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- スクラッチパッド（手書き計算メモモーダル） -->
+  <div id="scratchpadModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">📝 けいさんメモ（手書きスペース）</h3>
+        <button id="closeScratchBtn" class="text-slate-400 hover:text-slate-700 text-2xl font-bold px-2">✕</button>
+      </div>
+      <div class="modal-body flex flex-col gap-3">
+        <p class="text-xs text-slate-500">
+          マウスやタッチペン、指で通分の公倍数やひっ算をメモできます！
+        </p>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button class="tool-btn pen-color-btn ring-2 ring-blue-600" data-color="#2563eb">🔵 青ペン</button>
+          <button class="tool-btn pen-color-btn" data-color="#dc2626">🔴 赤ペン</button>
+          <button class="tool-btn pen-color-btn" data-color="#1e293b">⚫ 黒ペン</button>
+          <button id="eraserBtn" class="tool-btn">🧹 けしゴム</button>
+          <button id="clearScratchBtn" class="tool-btn text-rose-600 border-rose-200 hover:bg-rose-50 ml-auto">全消去</button>
+        </div>
+        <div class="scratch-canvas-container">
+          <canvas id="scratchCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 学習ガイド（通分・約分のコツ）モーダル -->
+  <div id="guideModal" class="modal-overlay hidden">
+    <div class="modal-card max-w-xl">
+      <div class="modal-header">
+        <h3 class="modal-title">📖 小学校5年生の通分・約分のコツ</h3>
+        <button id="closeGuideBtn" class="text-slate-400 hover:text-slate-700 text-2xl font-bold px-2">✕</button>
+      </div>
+      <div class="modal-body space-y-4 text-sm text-slate-700">
+        <!-- コツ1 -->
+        <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-200">
+          <h4 class="font-bold text-indigo-900 mb-1 flex items-center gap-1">
+            <span>1️⃣</span> 通分の3大パターン
+          </h4>
+          <ul class="list-disc list-inside space-y-1 text-xs text-indigo-950">
+            <li><strong>倍数の関係:</strong> 一方が他方の倍数のときは、大きい方の分母にそろえる！<br>（例: 2 と 4 → <strong>4</strong> にそろえる）</li>
+            <li><strong>互いに素:</strong> かけ算でそろえる！<br>（例: 2 と 3 → 2×3 = <strong>6</strong> にそろえる）</li>
+            <li><strong>共通の約数があるとき:</strong> かけ算より小さい最小公倍数を見つけよう！<br>（例: 4 と 6 → 4×6=24 ではなく <strong>12</strong>！）</li>
+          </ul>
+        </div>
+
+        <!-- コツ2 -->
+        <div class="bg-amber-50 p-3 rounded-xl border border-amber-200">
+          <h4 class="font-bold text-amber-900 mb-1 flex items-center gap-1">
+            <span>2️⃣</span> 分子にも同じ数をかけるのを忘れずに！
+          </h4>
+          <p class="text-xs text-amber-950">
+            分母を2倍、3倍にしたら、<strong>分子にも同じ数</strong>をかけないと大きさが変わってしまいます。
+            <br>例: $\frac{1}{2}$ を分母6にするなら、分子も $1 \times 3 = 3$ で $\frac{3}{6}$！
+          </p>
+        </div>
+
+        <!-- コツ3 -->
+        <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200">
+          <h4 class="font-bold text-emerald-900 mb-1 flex items-center gap-1">
+            <span>3️⃣</span> 答えが出たら必ず「約分チェック」！
+          </h4>
+          <p class="text-xs text-emerald-950">
+            答えの分子と分母が両方とも偶数（2で割れる）や、両方とも3や5で割れるときは、<strong>これ以上割れなくなるまで約分</strong>しよう！
+            <br>例: $\frac{4}{6} \rightarrow \frac{2}{3}$
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ゲームオーバー & 復習リザルトモーダル -->
+  <div id="gameOverModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header bg-rose-50 border-b border-rose-200">
+        <h3 class="modal-title text-rose-700">🏰 城が破られた... ゲームオーバー</h3>
+      </div>
+      <div class="modal-body flex flex-col gap-4">
+        <!-- スコア概要グリッド -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+          <div class="bg-slate-100 p-3 rounded-xl">
+            <div class="text-xs text-slate-500 font-bold">獲得スコア</div>
+            <div id="finalScoreDisplay" class="text-xl font-black text-indigo-600">0</div>
+          </div>
+          <div class="bg-slate-100 p-3 rounded-xl">
+            <div class="text-xs text-slate-500 font-bold">最高スコア</div>
+            <div id="finalHighScoreDisplay" class="text-xl font-black text-amber-600">0</div>
+          </div>
+          <div class="bg-slate-100 p-3 rounded-xl">
+            <div class="text-xs text-slate-500 font-bold">到達ウェーブ</div>
+            <div id="finalWaveDisplay" class="text-xl font-black text-slate-800">1</div>
+          </div>
+          <div class="bg-slate-100 p-3 rounded-xl">
+            <div class="text-xs text-slate-500 font-bold">最大コンボ</div>
+            <div id="finalComboDisplay" class="text-xl font-black text-rose-600">0</div>
+          </div>
+        </div>
+
+        <div class="text-center text-xs text-slate-500">
+          撃破したモンスター総数: <span id="finalDefeatedDisplay" class="font-bold text-slate-700">0 体</span>
+        </div>
+
+        <!-- 復習リスト -->
+        <div>
+          <h4 class="font-bold text-slate-800 text-sm mb-2 flex items-center gap-1">
+            📚 今回出題された問題の復習ノート:
+          </h4>
+          <div id="reviewListContainer" class="max-h-56 overflow-y-auto space-y-2 pr-1">
+            <!-- 動的に生成 -->
+          </div>
+        </div>
+
+        <!-- 再挑戦ボタン -->
+        <button id="restartBtn" class="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-black text-lg py-3 rounded-xl shadow-lg active:scale-95 transition-all">
+          🔄 もう一度ちょうせんする！
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- スクリプト読込 -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# Security rules: 禁止メディア・原本ファイル除外
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.webp
+*.pdf
+*テスト*
+*原本*
+*教材*
+
+# Node & Build artifacts
+node_modules/
+dist/
+.cache/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
