@@ -55,6 +55,12 @@ async function run() {
     send('Log.enable');
     send('Network.enable');
     send('Page.enable');
+    send('Emulation.setDeviceMetricsOverride', {
+      width: 1280,
+      height: 800,
+      deviceScaleFactor: 1,
+      mobile: false
+    });
   };
 
   ws.onmessage = async (event) => {
