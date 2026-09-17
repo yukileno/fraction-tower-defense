@@ -140,7 +140,7 @@ export class RankingManager {
     if (this.gasUrl && isOnline) {
       try {
         const sep = this.gasUrl.includes('?') ? '&' : '?';
-        const targetUrl = `${this.gasUrl}${sep}app=td&_t=${Date.now()}`;
+        const targetUrl = `${this.gasUrl}${sep}app=${encodeURIComponent('分数足し算引き算')}&sheet=${encodeURIComponent('分数足し算引き算')}&game=td&_t=${Date.now()}`;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4000); // 4秒タイムアウト
 
@@ -188,7 +188,9 @@ export class RankingManager {
     const waveStr = wave ? (String(wave).includes('ウェーブ') ? String(wave) : `ウェーブ ${wave}`) : 'ウェーブ 1';
 
     const entry = {
-      app: 'td',
+      app: '分数足し算引き算',
+      sheet: '分数足し算引き算',
+      game: 'td',
       name: safeName,
       score: Number(score) || 0,
       wave: waveStr,

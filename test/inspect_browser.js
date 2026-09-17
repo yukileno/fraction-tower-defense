@@ -166,7 +166,7 @@ async function run() {
               send('Page.captureScreenshot', { format: 'png' });
             }, 2000);
           }, 1500);
-        }, 1500);
+        }, 3500);
       }, 1500);
     }
 
@@ -193,8 +193,8 @@ async function run() {
     }
   };
 
-  // Wait 10 seconds to observe full flow
-  await new Promise(r => setTimeout(r, 10000));
+  // Wait 13 seconds to observe full flow
+  await new Promise(r => setTimeout(r, 13000));
 
   ws.close();
   browser.kill();

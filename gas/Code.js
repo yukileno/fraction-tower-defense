@@ -3,7 +3,7 @@
  * 
  * スプレッドシート: 10QgA_xLFwK423Rv0xBeoafsbmPr_DeVS7-zU1rwLb5s
  * - 既存シート: 'Scores' (通分マスター)
- * - 追加シート: '分数タワーディフェンス' (分数まどうタワーディフェンス)
+ * - 追加シート: '分数足し算引き算' (分数まどうタワーディフェンス)
  */
 
 function getTargetSheet(params) {
@@ -11,11 +11,24 @@ function getTargetSheet(params) {
   const app = (params && (params.app || params.game || params.unit || params.sheet)) || '';
   const isTd = app.toString().toLowerCase().includes('td') || 
                app.toString().includes('タワー') || 
-               app.toString().includes('tower');
+               app.toString().includes('tower') ||
+               app.toString().includes('足し算') ||
+               app.toString().includes('引き算') ||
+               app.toString().includes('分数');
 
   if (isTd) {
-    const sheetName = '分数タワーディフェンス';
+    const sheetName = '分数足し算引き算';
     let sheet = ss.getSheetByName(sheetName);
+
+    // 旧シート「分数タワーディフェンス」が存在していればリネームして移行
+    if (!sheet) {
+      const oldSheet = ss.getSheetByName('分数タワーディフェンス');
+      if (oldSheet) {
+        oldSheet.setName(sheetName);
+        sheet = oldSheet;
+      }
+    }
+
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
       sheet.appendRow(['名前', 'スコア', '到達ウェーブ', 'たおした数', '最大コンボ', '登録日時']);
