@@ -174,7 +174,7 @@ export class TowerDefenseGame {
     }
 
     this.spawnTimer = 0;
-    this.spawnInterval = 8000;
+    this.spawnInterval = 7000;
     if (this.monstersToSpawn.length > 0) {
       const first = this.monstersToSpawn.shift();
       this.spawnMonster(first);
@@ -183,6 +183,7 @@ export class TowerDefenseGame {
   }
 
   spawnMonster(config) {
+    if (!config || !config.problem) return;
     const speeds = {
       slime: 0.16,
       golem: 0.13,
@@ -453,13 +454,26 @@ export class TowerDefenseGame {
     }
 
     this.updateTarget();
+    this.checkWaveStatus();
+  }
 
-    if (this.monsters.length === 0 && this.monstersToSpawn.length === 0) {
-      this.onWaveClear();
+  checkWaveStatus() {
+    if (this.isGameOver) return;
+
+    if (this.monsters.length === 0) {
+      if (this.monstersToSpawn.length === 0) {
+        if (!this.isWaveClear) {
+          this.onWaveClear();
+        }
+      } else {
+        // 画面上に敵がいない場合は、テンポ良く余韻(700ms)の後に即スポーン
+        this.spawnTimer = Math.max(this.spawnTimer, this.spawnInterval - 700);
+      }
     }
   }
 
   onWaveClear() {
+    if (this.isWaveClear || this.isGameOver) return;
     this.isWaveClear = true;
     this.score += 500;
     this.showFloatingText(`🎉 ウェーブ ${this.wave} 完全防衛！ (+500点)`, 320, 200, '#eab308', 30, true);
@@ -528,6 +542,8 @@ export class TowerDefenseGame {
 
     if (this.lives <= 0) {
       this.triggerGameOver();
+    } else {
+      this.checkWaveStatus();
     }
   }
 
@@ -615,11 +631,18 @@ export class TowerDefenseGame {
     // スポーン処理
     if (this.monstersToSpawn.length > 0) {
       this.spawnTimer += dt * 1000;
-      if (this.spawnTimer >= this.spawnInterval) {
+      // 画面上に敵が1体もいなければ、間隔を短縮（最大700msで即座に次の敵が出現）
+      const effectiveInterval = (this.monsters.length === 0) ? 700 : this.spawnInterval;
+      if (this.spawnTimer >= effectiveInterval) {
         this.spawnTimer = 0;
         const next = this.monstersToSpawn.shift();
-        this.spawnMonster(next);
+        if (next) {
+          this.spawnMonster(next);
+        }
       }
+    } else if (this.monsters.length === 0 && !this.isWaveClear && !this.isGameOver) {
+      // セーフティ：画面にも待機列にも敵がいないのにウェーブクリア未処理の場合
+      this.onWaveClear();
     }
 
     // 流星（シューティングスター）の定期発生

@@ -7,8 +7,8 @@ export class Scratchpad {
     this.canvas = canvasElement;
     this.ctx = canvasElement.getContext('2d');
     this.isDrawing = false;
-    this.color = '#2563eb'; // 青ペン
-    this.lineWidth = 3;
+    this.color = '#3b82f6'; // 青ペン (Tailwind blue-500)
+    this.lineWidth = 1.5;
     this.isEraser = false;
 
     this.init();
@@ -70,8 +70,9 @@ export class Scratchpad {
     this.ctx.moveTo(pos.x, pos.y);
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
-    this.ctx.strokeStyle = this.isEraser ? '#ffffff' : this.color;
-    this.ctx.lineWidth = this.isEraser ? 16 : this.lineWidth;
+    this.ctx.globalCompositeOperation = this.isEraser ? 'destination-out' : 'source-over';
+    this.ctx.strokeStyle = this.isEraser ? 'rgba(0,0,0,1)' : this.color;
+    this.ctx.lineWidth = this.isEraser ? 14 : this.lineWidth;
   }
 
   draw(e) {
@@ -85,12 +86,17 @@ export class Scratchpad {
     if (this.isDrawing) {
       this.ctx.closePath();
       this.isDrawing = false;
+      this.ctx.globalCompositeOperation = 'source-over';
     }
   }
 
   setColor(color) {
     this.isEraser = false;
     this.color = color;
+  }
+
+  setLineWidth(width) {
+    this.lineWidth = width;
   }
 
   setEraser(enabled = true) {

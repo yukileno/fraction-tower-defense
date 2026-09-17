@@ -38,6 +38,7 @@ const toggleMixedBtn = document.getElementById('toggleMixedBtn');
 // スクラッチパッド（手書き計算スペース）
 const clearScratchBtn = document.getElementById('clearScratchBtn');
 const penColorBtns = document.querySelectorAll('.pen-color-btn');
+const penWidthBtns = document.querySelectorAll('.pen-width-btn');
 const eraserBtn = document.getElementById('eraserBtn');
 
 // サウンド切替
@@ -135,11 +136,19 @@ const game = new TowerDefenseGame(canvas, {
 // 問題の描画
 function renderProblem(problem) {
   if (!problem) {
-    problemArea.innerHTML = `
-      <div class="text-slate-400 font-bold text-sm py-2 flex items-center justify-center gap-2">
-        <span class="inline-block animate-spin">🌀</span> 次のモンスターが迫っています...
-      </div>
-    `;
+    if (game.isWaveClear) {
+      problemArea.innerHTML = `
+        <div class="text-amber-300 font-bold text-sm py-2 flex items-center justify-center gap-2 animate-pulse">
+          <span>🎉</span> ウェーブ防衛成功！ 次のウェーブを準備中...
+        </div>
+      `;
+    } else {
+      problemArea.innerHTML = `
+        <div class="text-slate-400 font-bold text-sm py-2 flex items-center justify-center gap-2">
+          <span class="inline-block animate-spin">🌀</span> 次のモンスターが迫っています...
+        </div>
+      `;
+    }
     hintBox.classList.add('hidden');
     return;
   }
@@ -362,6 +371,20 @@ penColorBtns.forEach(btn => {
     eraserBtn.classList.remove('ring-2', 'ring-amber-400');
     penColorBtns.forEach(b => b.classList.remove('ring-2', 'ring-blue-500'));
     e.currentTarget.classList.add('ring-2', 'ring-blue-500');
+  });
+});
+
+penWidthBtns.forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    sound.playClick();
+    const width = parseFloat(e.currentTarget.dataset.width);
+    scratchpad.setLineWidth(width);
+    penWidthBtns.forEach(b => {
+      b.classList.remove('bg-indigo-600', 'text-white');
+      b.classList.add('text-slate-400');
+    });
+    e.currentTarget.classList.add('bg-indigo-600', 'text-white');
+    e.currentTarget.classList.remove('text-slate-400');
   });
 });
 
