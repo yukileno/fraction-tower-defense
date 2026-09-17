@@ -32,7 +32,7 @@ async function run() {
   });
   await new Promise(resolve => server.listen(8888, resolve));
 
-  const targetUrl = 'http://localhost:8888/';
+  const targetUrl = 'https://yukileno.github.io/fraction-tower-defense/';
   console.log('Launching browser with target URL...', targetUrl);
   const browser = spawn(edgePath, [
     '--headless=new',
