@@ -114,6 +114,7 @@ export class TowerDefenseGame {
     this.updateHUD();
     this.prepareWave(this.wave);
 
+    this.render(); // 初回フレームを即座に描画
     this.lastTime = performance.now();
     requestAnimationFrame((t) => this.gameLoop(t));
   }
@@ -146,7 +147,12 @@ export class TowerDefenseGame {
       });
     }
 
-    this.spawnTimer = this.spawnInterval; // 初回モンスターを即時出現
+    this.spawnTimer = 0;
+    // 初回モンスターを即座にスポーン
+    if (this.monstersToSpawn.length > 0) {
+      const first = this.monstersToSpawn.shift();
+      this.spawnMonster(first);
+    }
     this.showFloatingText(`ウェーブ ${waveNum} スタート！`, 480, 200, '#fbbf24', 36);
   }
 
