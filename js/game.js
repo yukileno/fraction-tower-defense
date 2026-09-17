@@ -68,17 +68,17 @@ export class TowerDefenseGame {
 
     // パス定義（城は左下、出現は右上〜右）
     this.path = [
-      { x: 920, y: 120 },
-      { x: 740, y: 120 },
-      { x: 620, y: 220 },
-      { x: 420, y: 220 },
-      { x: 300, y: 360 },
-      { x: 120, y: 360 }
+      { x: 620, y: 100 },
+      { x: 470, y: 100 },
+      { x: 380, y: 220 },
+      { x: 250, y: 220 },
+      { x: 170, y: 360 },
+      { x: 80, y: 360 }
     ];
 
     // タワー（魔法使いの城壁）の位置
     this.tower = {
-      x: 100,
+      x: 70,
       y: 320,
       staffGlow: 0,
       castAnim: 0
@@ -90,7 +90,7 @@ export class TowerDefenseGame {
   }
 
   initCanvasSize() {
-    this.canvas.width = 960;
+    this.canvas.width = 640;
     this.canvas.height = 480;
   }
 
@@ -124,7 +124,7 @@ export class TowerDefenseGame {
     this.monstersToSpawn = [];
 
     // ウェーブごとの敵数と難易度レベル
-    const count = 3 + Math.min(waveNum, 6);
+    const count = 3 + Math.min(waveNum, 5);
     let levelId = 1;
     if (waveNum === 1) levelId = 1;       // 基礎通分（倍数）
     else if (waveNum === 2) levelId = 2;  // 基本通分（積）
@@ -143,26 +143,28 @@ export class TowerDefenseGame {
         type: enemyType,
         isBoss,
         problem,
-        spawnDelay: i * 4000 // 各モンスターの間隔
+        spawnDelay: i * 8000 // 間隔を広げて落ち着いて解けるように
       });
     }
 
     this.spawnTimer = 0;
+    this.spawnInterval = 8000; // 8秒間隔でじっくり出撃
     // 初回モンスターを即座にスポーン
     if (this.monstersToSpawn.length > 0) {
       const first = this.monstersToSpawn.shift();
       this.spawnMonster(first);
     }
-    this.showFloatingText(`ウェーブ ${waveNum} スタート！`, 480, 200, '#fbbf24', 36);
+    this.showFloatingText(`ウェーブ ${waveNum} スタート！`, 320, 200, '#fbbf24', 32);
   }
 
   spawnMonster(config) {
+    // 5年生が通分・約分を手書きメモで計算できるゆったりスピード
     const speeds = {
-      slime: 0.55,
-      goblin: 0.75,
-      bat: 0.95,
-      golem: 0.50,
-      dragon: 0.45
+      slime: 0.16,   // 最もゆっくり
+      golem: 0.13,   // どっしり
+      goblin: 0.20,  // 標準
+      bat: 0.24,     // やや速い
+      dragon: 0.14   // ボス（威風堂々）
     };
 
     const monster = {
@@ -311,7 +313,7 @@ export class TowerDefenseGame {
       });
     }
 
-    this.showFloatingText('❄️ タイムフリーズ発動！敵の動きが停止！', 480, 160, '#38bdf8', 26);
+    this.showFloatingText('❄️ タイムフリーズ発動！敵の動きが停止！', 320, 160, '#38bdf8', 26);
     this.updateHUD();
     return true;
   }
@@ -387,7 +389,7 @@ export class TowerDefenseGame {
   onWaveClear() {
     this.isWaveClear = true;
     this.score += 500;
-    this.showFloatingText(`🎉 ウェーブ ${this.wave} クリア！ (+500点)`, 480, 200, '#eab308', 32);
+    this.showFloatingText(`🎉 ウェーブ ${this.wave} クリア！ (+500点)`, 320, 200, '#eab308', 32);
 
     setTimeout(() => {
       if (!this.isGameOver) {
@@ -649,11 +651,11 @@ export class TowerDefenseGame {
     this.ctx.fillStyle = 'rgba(5, 150, 105, 0.4)';
     const trees = [
       { x: 500, y: 70, r: 25 },
-      { x: 800, y: 50, r: 35 },
-      { x: 250, y: 150, r: 20 },
-      { x: 550, y: 350, r: 30 },
-      { x: 780, y: 380, r: 28 },
-      { x: 420, y: 440, r: 22 }
+      { x: 580, y: 50, r: 30 },
+      { x: 180, y: 150, r: 20 },
+      { x: 420, y: 350, r: 30 },
+      { x: 560, y: 380, r: 28 },
+      { x: 300, y: 440, r: 22 }
     ];
     trees.forEach(t => {
       this.ctx.beginPath();
