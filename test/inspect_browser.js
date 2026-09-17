@@ -74,13 +74,47 @@ async function run() {
           const p = document.getElementById("problemArea");
           const s = document.getElementById("scoreDisplay");
           const canvas = document.getElementById("gameCanvas");
-          const ctx = canvas ? canvas.getContext("2d") : null;
-          const pixel = ctx ? ctx.getImageData(100, 100, 1, 1).data : null;
+          const scratch = document.getElementById("scratchCanvas");
+          const widthBtns = document.querySelectorAll(".pen-width-btn");
+
+          // 手書きキャンバスにテスト用の計算メモ（細字 1.5px）をシミュレート描画
+          if (scratch) {
+            const ctx = scratch.getContext("2d");
+            ctx.strokeStyle = "#3b82f6";
+            ctx.lineWidth = 1.5;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            
+            // "1/3 + 1/6" の手書きメモを描画
+            ctx.beginPath();
+            // "1"
+            ctx.moveTo(40, 50); ctx.lineTo(40, 90);
+            // 横棒
+            ctx.moveTo(30, 95); ctx.lineTo(55, 95);
+            // "3"
+            ctx.moveTo(35, 105); ctx.lineTo(50, 105); ctx.lineTo(40, 115); ctx.lineTo(50, 125); ctx.lineTo(35, 125);
+            // "+"
+            ctx.moveTo(70, 95); ctx.lineTo(85, 95);
+            ctx.moveTo(77, 87); ctx.lineTo(77, 103);
+            // "1"
+            ctx.moveTo(105, 50); ctx.lineTo(105, 90);
+            // 横棒
+            ctx.moveTo(95, 95); ctx.lineTo(120, 95);
+            // "6"
+            ctx.moveTo(115, 105); ctx.lineTo(100, 115); ctx.lineTo(115, 125); ctx.lineTo(100, 125); ctx.lineTo(100, 115);
+            // "="
+            ctx.moveTo(135, 92); ctx.lineTo(150, 92);
+            ctx.moveTo(135, 98); ctx.lineTo(150, 98);
+            // "3/6 = 1/2"
+            ctx.stroke();
+          }
+
           return {
             title: document.title,
-            problem: p ? p.innerText : null,
+            problem: p ? p.innerText.replace(/\\s+/g, ' ').trim() : null,
             score: s ? s.innerText : null,
-            canvasPixel: pixel ? Array.from(pixel) : null
+            penWidthBtnCount: widthBtns.length,
+            penWidthLabels: Array.from(widthBtns).map(b => b.innerText)
           };
         })()`,
         returnByValue: true
