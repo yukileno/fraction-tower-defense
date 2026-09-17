@@ -4,6 +4,7 @@
 import { TowerDefenseGame } from './game.js';
 import { Scratchpad } from './scratchpad.js';
 import { sound } from './audio.js';
+import { ranking } from './ranking.js';
 
 // DOM要素
 const canvas = document.getElementById('gameCanvas');
@@ -20,6 +21,7 @@ const mpBar = document.getElementById('mpBar');
 const mpText = document.getElementById('mpText');
 const freezeSkillBadge = document.getElementById('freezeSkillBadge');
 const meteorSkillBadge = document.getElementById('meteorSkillBadge');
+const openRankingBtn = document.getElementById('openRankingBtn');
 
 // 入力・問題要素
 const problemArea = document.getElementById('problemArea');
@@ -44,7 +46,12 @@ const eraserBtn = document.getElementById('eraserBtn');
 // サウンド切替
 const soundToggleBtn = document.getElementById('soundToggleBtn');
 
-// ゲームオーバーモーダル
+// 初期画面（スタート & ランキング 2ボタン）
+const startOverlay = document.getElementById('startOverlay');
+const startGameBtn = document.getElementById('startGameBtn');
+const titleRankingBtn = document.getElementById('titleRankingBtn');
+
+// ゲームオーバーモーダル & スコア登録
 const gameOverModal = document.getElementById('gameOverModal');
 const finalScoreDisplay = document.getElementById('finalScoreDisplay');
 const finalHighScoreDisplay = document.getElementById('finalHighScoreDisplay');
@@ -52,7 +59,26 @@ const finalWaveDisplay = document.getElementById('finalWaveDisplay');
 const finalComboDisplay = document.getElementById('finalComboDisplay');
 const finalDefeatedDisplay = document.getElementById('finalDefeatedDisplay');
 const reviewListContainer = document.getElementById('reviewListContainer');
+const playerNameInput = document.getElementById('playerNameInput');
+const submitScoreBtn = document.getElementById('submitScoreBtn');
+const scoreSubmitStatus = document.getElementById('scoreSubmitStatus');
+const backToTitleBtn = document.getElementById('backToTitleBtn');
 const restartBtn = document.getElementById('restartBtn');
+
+// ランキングモーダル
+const rankingModal = document.getElementById('rankingModal');
+const closeRankingBtn = document.getElementById('closeRankingBtn');
+const refreshRankingBtn = document.getElementById('refreshRankingBtn');
+const rankingTableBody = document.getElementById('rankingTableBody');
+const rankingStatusText = document.getElementById('rankingStatusText');
+
+// スプレッドシート連携設定モーダル
+const gasSettingModal = document.getElementById('gasSettingModal');
+const openGasSettingBtn = document.getElementById('openGasSettingBtn');
+const closeGasSettingBtn = document.getElementById('closeGasSettingBtn');
+const gasUrlInput = document.getElementById('gasUrlInput');
+const saveGasUrlBtn = document.getElementById('saveGasUrlBtn');
+const resetGasUrlBtn = document.getElementById('resetGasUrlBtn');
 
 // ガイドモーダル
 const guideModal = document.getElementById('guideModal');
@@ -404,13 +430,24 @@ closeGuideBtn.addEventListener('click', () => {
   guideModal.classList.add('hidden');
 });
 
+// 現在のゲーム結果一時保持
+let lastGameResult = null;
+
 // ゲームオーバー画面 & 復習リスト
 function showGameOver(data) {
+  lastGameResult = data;
   finalScoreDisplay.textContent = data.score.toLocaleString();
   finalHighScoreDisplay.textContent = data.highScore.toLocaleString();
   finalWaveDisplay.textContent = data.wave;
   finalComboDisplay.textContent = `${data.maxCombo} 回`;
   finalDefeatedDisplay.textContent = `${data.totalDefeated} 体`;
+
+  // スコア登録欄のリセットとプレイヤー名の復元
+  playerNameInput.value = ranking.getLastPlayerName() || '';
+  submitScoreBtn.disabled = false;
+  submitScoreBtn.innerHTML = '🚀 <span>登録する</span>';
+  scoreSubmitStatus.classList.add('hidden');
+  scoreSubmitStatus.textContent = '';
 
   reviewListContainer.innerHTML = '';
   if (data.history.length === 0) {
@@ -448,6 +485,53 @@ function showGameOver(data) {
   gameOverModal.classList.remove('hidden');
 }
 
+// スコア登録処理
+submitScoreBtn.addEventListener('click', async () => {
+  if (!lastGameResult) return;
+  const name = (playerNameInput.value || 'ななし').trim();
+  if (!name) {
+    playerNameInput.focus();
+    return;
+  }
+
+  sound.playClick();
+  submitScoreBtn.disabled = true;
+  submitScoreBtn.innerHTML = '<span class="inline-block animate-spin">🌀</span> <span>送信中...</span>';
+
+  try {
+    await ranking.submitScore({
+      name,
+      score: lastGameResult.score,
+      wave: lastGameResult.wave,
+      defeated: lastGameResult.totalDefeated,
+      combo: lastGameResult.maxCombo
+    });
+
+    scoreSubmitStatus.textContent = '✅ スコアを登録しました！';
+    scoreSubmitStatus.classList.remove('hidden');
+    submitScoreBtn.innerHTML = '✨ <span>登録完了！</span>';
+
+    // 1秒後にランキングモーダルを開いて順位を見せる
+    setTimeout(() => {
+      openRankingModal();
+    }, 800);
+  } catch (err) {
+    scoreSubmitStatus.textContent = '⚠️ 登録中にエラーが発生しました（ローカルに保存されました）';
+    scoreSubmitStatus.classList.remove('hidden');
+    submitScoreBtn.disabled = false;
+    submitScoreBtn.innerHTML = '🚀 <span>もう一度登録</span>';
+  }
+});
+
+// タイトル画面へもどる
+backToTitleBtn.addEventListener('click', () => {
+  sound.playClick();
+  gameOverModal.classList.add('hidden');
+  clearInputs();
+  startOverlay.classList.remove('hidden');
+});
+
+// リスタート
 restartBtn.addEventListener('click', () => {
   sound.playClick();
   gameOverModal.classList.add('hidden');
@@ -455,15 +539,117 @@ restartBtn.addEventListener('click', () => {
   game.start();
 });
 
-// ゲーム初期起動
-function initGame() {
+// ==========================================
+// ランキングモーダル制御
+// ==========================================
+async function openRankingModal() {
+  sound.playClick();
+  rankingModal.classList.remove('hidden');
+  await loadAndRenderRanking();
+}
+
+async function loadAndRenderRanking() {
+  rankingStatusText.innerHTML = '<span class="inline-block animate-spin">🌀</span> 読み込み中...';
+  rankingTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-slate-400 font-bold">データを読み込んでいます...</td></tr>';
+
+  const res = await ranking.fetchRanking();
+  const records = res.records || [];
+
+  rankingStatusText.innerHTML = res.source === 'spreadsheet' 
+    ? '🟢 <span class="text-emerald-400 font-bold">スプレッドシート同期中</span>'
+    : '🟡 <span class="text-amber-400 font-bold">端末ローカル記録表示中</span>';
+
+  if (records.length === 0) {
+    rankingTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-slate-400">まだスコア記録がありません。プレイして一番乗りしよう！</td></tr>';
+    return;
+  }
+
+  rankingTableBody.innerHTML = '';
+  records.slice(0, 50).forEach((item, index) => {
+    const rank = index + 1;
+    let rankBadge = `${rank}`;
+    let rowClass = 'hover:bg-slate-800/50 transition-colors';
+
+    if (rank === 1) {
+      rankBadge = '<span class="text-lg">🥇</span>';
+      rowClass = 'bg-amber-950/30 font-bold hover:bg-amber-950/50 text-amber-200';
+    } else if (rank === 2) {
+      rankBadge = '<span class="text-lg">🥈</span>';
+      rowClass = 'bg-slate-800/40 font-bold hover:bg-slate-800/60 text-slate-200';
+    } else if (rank === 3) {
+      rankBadge = '<span class="text-lg">🥉</span>';
+      rowClass = 'bg-amber-950/20 font-bold hover:bg-amber-950/40 text-amber-300';
+    }
+
+    const tr = document.createElement('tr');
+    tr.className = rowClass;
+    tr.innerHTML = `
+      <td class="py-2.5 px-3 text-center font-black">${rankBadge}</td>
+      <td class="py-2.5 px-3 text-slate-100 font-bold truncate max-w-[120px]">${item.name || 'ななし'}</td>
+      <td class="py-2.5 px-3 text-right font-mono font-black text-amber-400">${(item.score || 0).toLocaleString()}</td>
+      <td class="py-2.5 px-3 text-center text-indigo-300">${item.wave || 'W1'}</td>
+      <td class="py-2.5 px-3 text-center text-slate-400 text-[11px] hidden sm:table-cell">${item.date || ''}</td>
+    `;
+    rankingTableBody.appendChild(tr);
+  });
+}
+
+// ランキング開閉イベント
+openRankingBtn.addEventListener('click', openRankingModal);
+titleRankingBtn.addEventListener('click', openRankingModal);
+closeRankingBtn.addEventListener('click', () => {
+  sound.playClick();
+  rankingModal.classList.add('hidden');
+});
+refreshRankingBtn.addEventListener('click', () => {
+  sound.playClick();
+  loadAndRenderRanking();
+});
+
+// スプレッドシート設定モーダル開閉
+openGasSettingBtn.addEventListener('click', () => {
+  sound.playClick();
+  gasUrlInput.value = ranking.getGasUrl();
+  gasSettingModal.classList.remove('hidden');
+});
+closeGasSettingBtn.addEventListener('click', () => {
+  sound.playClick();
+  gasSettingModal.classList.add('hidden');
+});
+saveGasUrlBtn.addEventListener('click', () => {
+  sound.playClick();
+  ranking.setGasUrl(gasUrlInput.value);
+  gasSettingModal.classList.add('hidden');
+  loadAndRenderRanking();
+});
+resetGasUrlBtn.addEventListener('click', () => {
+  sound.playClick();
+  ranking.setGasUrl('');
+  gasUrlInput.value = ranking.getGasUrl();
+  gasSettingModal.classList.add('hidden');
+  loadAndRenderRanking();
+});
+
+// ==========================================
+// 初期画面（スタート & ランキング 2ボタン）制御
+// ==========================================
+startGameBtn.addEventListener('click', () => {
+  sound.playClick();
+  startOverlay.classList.add('hidden');
+  clearInputs();
   setActiveInput(numInput);
   game.start();
+  setTimeout(() => scratchpad.resize(), 150);
+});
+
+// 初期起動処理（ゲームは開始せず、タイトル待機）
+function initApp() {
+  setActiveInput(numInput);
   setTimeout(() => scratchpad.resize(), 200);
 }
 
 if (document.readyState === 'loading') {
-  window.addEventListener('DOMContentLoaded', initGame);
+  window.addEventListener('DOMContentLoaded', initApp);
 } else {
-  initGame();
+  initApp();
 }
