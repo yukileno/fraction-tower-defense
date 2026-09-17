@@ -452,7 +452,13 @@ restartBtn.addEventListener('click', () => {
 });
 
 // ゲーム初期起動
-window.addEventListener('DOMContentLoaded', () => {
+function initGame() {
   setActiveInput(numInput);
   game.start();
-});
+}
+
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', initGame);
+} else {
+  initGame();
+}

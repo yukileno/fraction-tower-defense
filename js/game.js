@@ -146,7 +146,7 @@ export class TowerDefenseGame {
       });
     }
 
-    this.spawnTimer = 0;
+    this.spawnTimer = this.spawnInterval; // 初回モンスターを即時出現
     this.showFloatingText(`ウェーブ ${waveNum} スタート！`, 480, 200, '#fbbf24', 36);
   }
 
