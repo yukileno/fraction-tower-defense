@@ -1,12 +1,38 @@
 import { spawn } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
+import http from 'node:http';
+import fs from 'node:fs';
 
 async function run() {
   const edgePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
   const userDataDir = path.join(os.tmpdir(), 'edge-debug-' + Date.now());
 
-  const targetUrl = 'https://yukileno.github.io/fraction-tower-defense/';
+  // 簡易静的ファイルサーバーを起動（カレントディレクトリ td）
+  const mimeTypes = {
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.json': 'application/json'
+  };
+  const server = http.createServer((req, res) => {
+    let reqPath = req.url.split('?')[0];
+    if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
+    const filePath = path.join(process.cwd(), reqPath);
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      const ext = path.extname(filePath).toLowerCase();
+      res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
+      fs.createReadStream(filePath).pipe(res);
+    } else {
+      res.writeHead(404);
+      res.end('Not found');
+    }
+  });
+  await new Promise(resolve => server.listen(8888, resolve));
+
+  const targetUrl = 'http://localhost:8888/';
   console.log('Launching browser with target URL...', targetUrl);
   const browser = spawn(edgePath, [
     '--headless=new',
@@ -27,8 +53,8 @@ async function run() {
       const res = await fetch('http://localhost:9222/json/list');
       const json = await res.json();
       if (json && json.length > 0) {
-        // Find page target matching fraction-tower-defense
-        target = json.find(t => t.type === 'page' && t.url.includes('fraction-tower-defense')) || json.find(t => t.type === 'page');
+        // Find page target matching localhost or td
+        target = json.find(t => t.type === 'page' && (t.url.includes('localhost:8888') || t.url.includes('fraction-tower-defense'))) || json.find(t => t.type === 'page');
         if (target && target.webSocketDebuggerUrl) break;
       }
     } catch (e) {}
@@ -48,8 +74,6 @@ async function run() {
     ws.send(JSON.stringify({ id: msgId++, method, params }));
   }
 
-  const fs = await import('node:fs');
-
   ws.onopen = () => {
     send('Runtime.enable');
     send('Log.enable');
@@ -63,6 +87,7 @@ async function run() {
     });
   };
 
+  let shotIndex = 0;
   ws.onmessage = async (event) => {
     const data = JSON.parse(event.data);
     if (data.method === 'Page.loadEventFired') {
@@ -71,67 +96,92 @@ async function run() {
 
       send('Runtime.evaluate', {
         expression: `(() => {
-          const p = document.getElementById("problemArea");
-          const s = document.getElementById("scoreDisplay");
-          const canvas = document.getElementById("gameCanvas");
-          const scratch = document.getElementById("scratchCanvas");
-          const widthBtns = document.querySelectorAll(".pen-width-btn");
-
-          // 手書きキャンバスにテスト用の計算メモ（細字 1.5px）をシミュレート描画
-          if (scratch) {
-            const ctx = scratch.getContext("2d");
-            ctx.strokeStyle = "#3b82f6";
-            ctx.lineWidth = 1.5;
-            ctx.lineCap = "round";
-            ctx.lineJoin = "round";
-            
-            // "1/3 + 1/6" の手書きメモを描画
-            ctx.beginPath();
-            // "1"
-            ctx.moveTo(40, 50); ctx.lineTo(40, 90);
-            // 横棒
-            ctx.moveTo(30, 95); ctx.lineTo(55, 95);
-            // "3"
-            ctx.moveTo(35, 105); ctx.lineTo(50, 105); ctx.lineTo(40, 115); ctx.lineTo(50, 125); ctx.lineTo(35, 125);
-            // "+"
-            ctx.moveTo(70, 95); ctx.lineTo(85, 95);
-            ctx.moveTo(77, 87); ctx.lineTo(77, 103);
-            // "1"
-            ctx.moveTo(105, 50); ctx.lineTo(105, 90);
-            // 横棒
-            ctx.moveTo(95, 95); ctx.lineTo(120, 95);
-            // "6"
-            ctx.moveTo(115, 105); ctx.lineTo(100, 115); ctx.lineTo(115, 125); ctx.lineTo(100, 125); ctx.lineTo(100, 115);
-            // "="
-            ctx.moveTo(135, 92); ctx.lineTo(150, 92);
-            ctx.moveTo(135, 98); ctx.lineTo(150, 98);
-            // "3/6 = 1/2"
-            ctx.stroke();
-          }
-
+          const overlay = document.getElementById("startOverlay");
+          const startBtn = document.getElementById("startGameBtn");
+          const rankBtn = document.getElementById("titleRankingBtn");
           return {
-            title: document.title,
-            problem: p ? p.innerText.replace(/\\s+/g, ' ').trim() : null,
-            score: s ? s.innerText : null,
-            penWidthBtnCount: widthBtns.length,
-            penWidthLabels: Array.from(widthBtns).map(b => b.innerText)
+            overlayVisible: overlay && !overlay.classList.contains("hidden"),
+            startBtnText: startBtn ? startBtn.innerText.trim() : null,
+            rankBtnText: rankBtn ? rankBtn.innerText.trim() : null
           };
         })()`,
         returnByValue: true
       });
 
+      // 1. 初期画面のスクリーンショット
       send('Page.captureScreenshot', { format: 'png' });
+
+      // 2. ランキングボタンをクリックしてモーダルを開く
+      setTimeout(() => {
+        console.log('Clicking ranking button to open modal...');
+        send('Runtime.evaluate', {
+          expression: `(() => {
+            const rankBtn = document.getElementById("titleRankingBtn");
+            if (rankBtn) rankBtn.click();
+            return true;
+          })()`
+        });
+
+        setTimeout(() => {
+          console.log('Capturing ranking modal screenshot...');
+          send('Runtime.evaluate', {
+            expression: `(() => {
+              const modal = document.getElementById("rankingModal");
+              const rows = document.querySelectorAll("#rankingTableBody tr");
+              return {
+                modalVisible: modal && !modal.classList.contains("hidden"),
+                rowCount: rows.length
+              };
+            })()`,
+            returnByValue: true
+          });
+          send('Page.captureScreenshot', { format: 'png' });
+
+          // 3. ランキングモーダルを閉じて「ゲームスタート」をクリック
+          setTimeout(() => {
+            console.log('Closing ranking modal and clicking start game...');
+            send('Runtime.evaluate', {
+              expression: `(() => {
+                const closeBtn = document.getElementById("closeRankingBtn");
+                if (closeBtn) closeBtn.click();
+                const startBtn = document.getElementById("startGameBtn");
+                if (startBtn) startBtn.click();
+                return true;
+              })()`
+            });
+
+            setTimeout(() => {
+              console.log('Capturing live game screen after start...');
+              send('Runtime.evaluate', {
+                expression: `(() => {
+                  const p = document.getElementById("problemArea");
+                  const s = document.getElementById("scoreDisplay");
+                  return {
+                    gameProblem: p ? p.innerText.replace(/\\s+/g, ' ').trim() : null,
+                    score: s ? s.innerText : null
+                  };
+                })()`,
+                returnByValue: true
+              });
+              send('Page.captureScreenshot', { format: 'png' });
+            }, 2000);
+          }, 1500);
+        }, 1500);
+      }, 1500);
     }
 
     if (data.id && data.result) {
       if (data.result.result && data.result.result.value) {
-        console.log('DOM & Canvas state:', JSON.stringify(data.result.result.value, null, 2));
+        console.log('Inspection result:', JSON.stringify(data.result.result.value, null, 2));
       }
       if (data.result.data) {
+        shotIndex++;
+        const filenames = ['title_screen_cdp.png', 'ranking_modal_cdp.png', 'live_site_cdp.png'];
+        const name = filenames[shotIndex - 1] || `screen_${shotIndex}.png`;
         const buf = Buffer.from(data.result.data, 'base64');
-        const outPath = 'C:\\Users\\yukil\\.gemini\\antigravity\\brain\\838fdd43-5d91-4bac-8e34-849bea01ba04\\live_site_cdp.png';
+        const outPath = path.join('C:\\Users\\yukil\\.gemini\\antigravity\\brain\\838fdd43-5d91-4bac-8e34-849bea01ba04', name);
         fs.writeFileSync(outPath, buf);
-        console.log('Saved CDP screenshot to', outPath, `(${buf.length} bytes)`);
+        console.log('Saved screenshot to', outPath, `(${buf.length} bytes)`);
       }
     }
 
@@ -143,11 +193,12 @@ async function run() {
     }
   };
 
-  // Wait 6 seconds to observe
-  await new Promise(r => setTimeout(r, 6000));
+  // Wait 10 seconds to observe full flow
+  await new Promise(r => setTimeout(r, 10000));
 
   ws.close();
   browser.kill();
+  server.close();
   process.exit(0);
 }
 

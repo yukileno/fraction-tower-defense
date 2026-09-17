@@ -75,8 +75,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 999;
+  z-index: 900;
   padding: 16px;
+}
+
+.modal-above {
+  z-index: 1000;
+}
+
+.modal-top {
+  z-index: 1100;
 }
 
 .modal-card {
