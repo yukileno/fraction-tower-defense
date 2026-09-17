@@ -75,41 +75,47 @@ const game = new TowerDefenseGame(canvas, {
     for (let i = 0; i < status.maxLives; i++) {
       hearts += i < status.lives ? '❤️' : '🖤';
     }
-    livesDisplay.textContent = hearts;
+    if (livesDisplay) livesDisplay.textContent = hearts;
 
-    // スコア & ウェーブ
-    scoreDisplay.textContent = status.score.toLocaleString();
-    highScoreDisplay.textContent = status.highScore.toLocaleString();
-    waveDisplay.textContent = `ウェーブ ${status.wave}`;
+    // スコア & ウェーブ & ハイスコア
+    if (scoreDisplay) scoreDisplay.textContent = status.score.toLocaleString();
+    if (highScoreDisplay) highScoreDisplay.textContent = status.highScore.toLocaleString();
+    if (waveDisplay) waveDisplay.textContent = `ウェーブ ${status.wave}`;
 
     // コンボバッジ
-    if (status.combo > 1) {
-      comboBadge.classList.remove('hidden');
-      comboText.textContent = `${status.combo} 連続せいかい！`;
-    } else {
-      comboBadge.classList.add('hidden');
+    if (comboBadge && comboText) {
+      if (status.combo > 1) {
+        comboBadge.classList.remove('hidden');
+        comboText.textContent = `${status.combo} 連続せいかい！`;
+      } else {
+        comboBadge.classList.add('hidden');
+      }
     }
 
     // MPゲージ
     const percent = Math.min(100, Math.floor((status.mp / status.maxMp) * 100));
-    mpBar.style.width = `${percent}%`;
-    mpText.textContent = `${percent}%`;
+    if (mpBar) mpBar.style.width = `${percent}%`;
+    if (mpText) mpText.textContent = `${percent}%`;
 
     // 必殺技ボタン有効状態
-    if (status.mp >= 50 && !game.isFrozen) {
-      freezeSkillBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-      freezeSkillBtn.classList.add('animate-pulse');
-    } else {
-      freezeSkillBtn.classList.add('opacity-50', 'cursor-not-allowed');
-      freezeSkillBtn.classList.remove('animate-pulse');
+    if (freezeSkillBtn) {
+      if (status.mp >= 50 && !game.isFrozen) {
+        freezeSkillBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        freezeSkillBtn.classList.add('animate-pulse');
+      } else {
+        freezeSkillBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        freezeSkillBtn.classList.remove('animate-pulse');
+      }
     }
 
-    if (status.mp >= 100) {
-      meteorSkillBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-      meteorSkillBtn.classList.add('animate-bounce');
-    } else {
-      meteorSkillBtn.classList.add('opacity-50', 'cursor-not-allowed');
-      meteorSkillBtn.classList.remove('animate-bounce');
+    if (meteorSkillBtn) {
+      if (status.mp >= 100) {
+        meteorSkillBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        meteorSkillBtn.classList.add('animate-bounce');
+      } else {
+        meteorSkillBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        meteorSkillBtn.classList.remove('animate-bounce');
+      }
     }
   },
 
