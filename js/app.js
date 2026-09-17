@@ -72,13 +72,6 @@ const refreshRankingBtn = document.getElementById('refreshRankingBtn');
 const rankingTableBody = document.getElementById('rankingTableBody');
 const rankingStatusText = document.getElementById('rankingStatusText');
 
-// スプレッドシート連携設定モーダル
-const gasSettingModal = document.getElementById('gasSettingModal');
-const openGasSettingBtn = document.getElementById('openGasSettingBtn');
-const closeGasSettingBtn = document.getElementById('closeGasSettingBtn');
-const gasUrlInput = document.getElementById('gasUrlInput');
-const saveGasUrlBtn = document.getElementById('saveGasUrlBtn');
-const resetGasUrlBtn = document.getElementById('resetGasUrlBtn');
 
 // ガイドモーダル
 const guideModal = document.getElementById('guideModal');
@@ -550,7 +543,7 @@ async function openRankingModal() {
 
 async function loadAndRenderRanking() {
   rankingStatusText.innerHTML = '<span class="inline-block animate-spin">🌀</span> 読み込み中...';
-  rankingTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-slate-400 font-bold">データを読み込んでいます...</td></tr>';
+  rankingTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-slate-400 font-bold">データを読み込んでいます...</td></tr>';
 
   const res = await ranking.fetchRanking();
   const records = res.records || [];
@@ -560,7 +553,7 @@ async function loadAndRenderRanking() {
     : '🟡 <span class="text-amber-400 font-bold">端末ローカル記録表示中</span>';
 
   if (records.length === 0) {
-    rankingTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-slate-400">まだスコア記録がありません。プレイして一番乗りしよう！</td></tr>';
+    rankingTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-slate-400">まだスコア記録がありません。プレイして一番乗りしよう！</td></tr>';
     return;
   }
 
@@ -588,7 +581,6 @@ async function loadAndRenderRanking() {
       <td class="py-2.5 px-3 text-slate-100 font-bold truncate max-w-[120px]">${item.name || 'ななし'}</td>
       <td class="py-2.5 px-3 text-right font-mono font-black text-amber-400">${(item.score || 0).toLocaleString()}</td>
       <td class="py-2.5 px-3 text-center text-indigo-300">${item.wave || 'W1'}</td>
-      <td class="py-2.5 px-3 text-center text-slate-400 text-[11px] hidden sm:table-cell">${item.date || ''}</td>
     `;
     rankingTableBody.appendChild(tr);
   });
@@ -603,30 +595,6 @@ closeRankingBtn.addEventListener('click', () => {
 });
 refreshRankingBtn.addEventListener('click', () => {
   sound.playClick();
-  loadAndRenderRanking();
-});
-
-// スプレッドシート設定モーダル開閉
-openGasSettingBtn.addEventListener('click', () => {
-  sound.playClick();
-  gasUrlInput.value = ranking.getGasUrl();
-  gasSettingModal.classList.remove('hidden');
-});
-closeGasSettingBtn.addEventListener('click', () => {
-  sound.playClick();
-  gasSettingModal.classList.add('hidden');
-});
-saveGasUrlBtn.addEventListener('click', () => {
-  sound.playClick();
-  ranking.setGasUrl(gasUrlInput.value);
-  gasSettingModal.classList.add('hidden');
-  loadAndRenderRanking();
-});
-resetGasUrlBtn.addEventListener('click', () => {
-  sound.playClick();
-  ranking.setGasUrl('');
-  gasUrlInput.value = ranking.getGasUrl();
-  gasSettingModal.classList.add('hidden');
   loadAndRenderRanking();
 });
 

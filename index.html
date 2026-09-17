@@ -290,9 +290,6 @@
             <button id="refreshRankingBtn" class="bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-600 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 active:scale-95 transition-transform">
               🔄 最新に更新
             </button>
-            <button id="openGasSettingBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-600 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 active:scale-95 transition-transform">
-              ⚙️ 連携設定
-            </button>
           </div>
         </div>
 
@@ -305,7 +302,6 @@
                 <th class="py-2.5 px-3">名前</th>
                 <th class="py-2.5 px-3 text-right">スコア</th>
                 <th class="py-2.5 px-3 text-center">到達</th>
-                <th class="py-2.5 px-3 text-center hidden sm:table-cell">日時</th>
               </tr>
             </thead>
             <tbody id="rankingTableBody" class="divide-y divide-slate-800/60 font-medium">
@@ -317,32 +313,6 @@
     </div>
   </div>
 
-  <!-- スプレッドシート連携設定モーダル -->
-  <div id="gasSettingModal" class="modal-overlay modal-top hidden">
-    <div class="modal-card max-w-md bg-slate-800 text-slate-100 border border-slate-600 rounded-2xl overflow-hidden shadow-2xl p-5 space-y-4">
-      <div class="flex items-center justify-between border-b border-slate-700 pb-2">
-        <h4 class="font-black text-indigo-400 text-sm flex items-center gap-1.5">
-          ⚙️ <span>スプレッドシート連携設定</span>
-        </h4>
-        <button id="closeGasSettingBtn" class="text-slate-400 hover:text-white text-xl font-bold">✕</button>
-      </div>
-      <p class="text-xs text-slate-300 leading-relaxed">
-        Google Apps Script の Web App URL（<code>https://script.google.com/macros/s/.../exec</code>）を指定します。
-      </p>
-      <div>
-        <label class="block text-[11px] text-slate-400 font-bold mb-1">Web App URL:</label>
-        <input id="gasUrlInput" type="url" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-xs text-slate-100 font-mono focus:border-indigo-500 focus:outline-none" placeholder="https://script.google.com/macros/s/.../exec">
-      </div>
-      <div class="flex gap-2">
-        <button id="saveGasUrlBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 rounded-lg text-xs transition-colors">
-          保存する
-        </button>
-        <button id="resetGasUrlBtn" class="bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold px-3 py-2 rounded-lg text-xs transition-colors">
-          初期値に戻す
-        </button>
-      </div>
-    </div>
-  </div>
 
   <!-- 初期画面（スタート & ランキング 2ボタン）オーバーレイ -->
   <div id="startOverlay" class="modal-overlay">
