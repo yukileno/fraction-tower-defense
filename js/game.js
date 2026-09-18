@@ -50,8 +50,8 @@ export class TowerDefenseGame {
     // 先生キャラクター（単一ボス）
     this.teacher = {
       distance: 80.0,
-      baseSpeed: 0.85,
-      currentSpeed: 0.85,
+      baseSpeed: 0.57,
+      currentSpeed: 0.57,
       angerMultiplier: 1.0,
       angerLevel: 0.0,
       walkCycle: 0,
@@ -239,8 +239,8 @@ export class TowerDefenseGame {
     this.isGameOver = false;
 
     this.teacher.distance = 80.0;
-    this.teacher.baseSpeed = 0.85;
-    this.teacher.currentSpeed = 0.85;
+    this.teacher.baseSpeed = 0.57;
+    this.teacher.currentSpeed = 0.57;
     this.teacher.angerMultiplier = 1.0;
     this.teacher.angerLevel = 0.0;
     this.teacher.walkCycle = 0;
@@ -278,16 +278,16 @@ export class TowerDefenseGame {
     this.phase = Math.min(5, Math.floor(this.questionsCleared / 10) + 1);
 
     if (this.phase === 1) {
-      this.teacher.baseSpeed = 0.85;
+      this.teacher.baseSpeed = 0.57;
     } else if (this.phase === 2) {
-      this.teacher.baseSpeed = 1.25;
+      this.teacher.baseSpeed = 0.83;
     } else if (this.phase === 3) {
-      this.teacher.baseSpeed = 1.85;
+      this.teacher.baseSpeed = 1.23;
     } else if (this.phase === 4) {
-      this.teacher.baseSpeed = 2.65;
+      this.teacher.baseSpeed = 1.77;
     } else if (this.phase === 5) {
       const overtime = Math.max(0, this.elapsedTime - 200);
-      this.teacher.baseSpeed = 3.6 + overtime * 0.015;
+      this.teacher.baseSpeed = 2.4 + overtime * 0.01;
     }
 
     this.teacher.currentSpeed = this.teacher.baseSpeed * this.teacher.angerMultiplier;

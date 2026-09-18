@@ -72,7 +72,7 @@ const beforeWrongDist = game.teacher.distance;
 const beforeSpeed = game.teacher.currentSpeed;
 const beforeAnger = game.teacher.angerMultiplier;
 
-const resWrong = game.submitAnswer(999, 999, 0);
+const resWrong = game.submitAnswer(997, 991, 0);
 assert.strictEqual(resWrong.status, 'wrong', '不正解判定が返ること');
 assert.ok(game.teacher.distance < beforeWrongDist, 'ミスにより先生が5m接近すること');
 assert.ok(game.teacher.angerMultiplier > beforeAnger, '先生の怒り倍率が増加すること');
@@ -88,7 +88,7 @@ for (let i = 0; i < 9; i++) {
 }
 assert.strictEqual(game.questionsCleared, 10, '10問クリアしていること');
 assert.strictEqual(game.phase, 2, '第2段階に進行していること');
-assert.ok(game.teacher.baseSpeed > 1.0, '第2段階でベース速度が上がっていること');
+assert.ok(game.teacher.baseSpeed > 0.6, '第2段階でベース速度が上がっていること');
 console.log(`✅ 4. 段階進行テスト通過（10問撃退 ➔ 第${game.phase}段階, ベース速度: ${game.teacher.baseSpeed}m/s）`);
 
 // 5. 必殺技テスト（お茶出しフリーズ & 宿題大嵐メテオ）
@@ -140,8 +140,8 @@ while (!simGame.isGameOver && simTime < 600) {
 const min = Math.floor(simTime / 60);
 const sec = Math.round(simTime % 60);
 console.log(`トップ層（6.5秒/問 ノーミス）の生存時間: ${min}分${sec}秒（${simTime.toFixed(1)}秒, ${simGame.questionsCleared}問撃退）`);
-assert.ok(simTime <= 300, '計算最速プレイヤーでも5分（300秒）以内にアウトになること！');
-assert.ok(simTime >= 200, '理不尽に速すぎず3分半以上は粘れること！');
-console.log('✅ 7. 難易度カーブ検証通過（目標の5分以内アウトを精密に達成！）');
+assert.ok(simTime <= 480, '計算最速プレイヤーでも8分（480秒）以内にアウトになること！');
+assert.ok(simTime >= 300, '理不尽に速すぎず5分以上は粘れること！');
+console.log('✅ 7. 難易度カーブ検証通過（速度2/3調整後の難易度確認OK！）');
 
 console.log('\n🎉 全てのテストが完璧に通過しました！');
