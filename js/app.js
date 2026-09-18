@@ -164,6 +164,7 @@ const game = new TowerDefenseGame(canvas, {
     showGameOver(result);
   }
 });
+window.gameInstance = game;
 
 // 問題の描画
 function renderProblem(problem) {
