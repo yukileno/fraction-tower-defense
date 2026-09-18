@@ -1090,18 +1090,24 @@ export class TowerDefenseGame {
 
     // 4. ネームプレート「渡部先生」
     ctx.save();
-    const nameY = -baseH - 6;
-    const namePlateW = Math.max(75, 85 * pos.scale);
-    const namePlateH = Math.max(16, 18 * pos.scale);
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
-    ctx.strokeStyle = t.angerMultiplier > 1.3 ? '#ef4444' : '#6366f1';
-    ctx.lineWidth = 1.5;
-    ctx.roundRect(-namePlateW / 2, nameY - namePlateH, namePlateW, namePlateH, 4);
+    const nameY = -baseH - 8;
+    const namePlateW = Math.max(90, 105 * pos.scale);
+    const namePlateH = Math.max(22, 25 * pos.scale);
+    const namePlateR = 5;
+
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+    ctx.shadowBlur = 4;
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = t.angerMultiplier > 1.3 ? '#ef4444' : '#0f172a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(-namePlateW / 2, nameY - namePlateH, namePlateW, namePlateH, namePlateR);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = t.angerMultiplier > 1.3 ? '#fca5a5' : '#fef08a';
-    ctx.font = `bold ${Math.max(10, 12 * pos.scale)}px sans-serif`;
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = t.angerMultiplier > 1.3 ? '#dc2626' : '#0f172a';
+    ctx.font = `bold ${Math.max(12, 13 * pos.scale)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const teacherName = t.angerMultiplier > 1.3 ? '🔥 渡部先生' : '渡部先生';
@@ -1112,19 +1118,20 @@ export class TowerDefenseGame {
     ctx.save();
     const bubbleText = t.angerMultiplier > 1.3 ? '家庭訪問じゃぁ〜!!' : '家庭訪問じゃぁ～';
     const bubbleScale = Math.min(1.2, Math.max(0.85, pos.scale));
-    const bubbleH = 26 * bubbleScale;
-    const bubbleW = 126 * bubbleScale;
-    const bubbleY = nameY - namePlateH - bubbleH - 8;
+    const bubbleH = Math.max(26, 28 * bubbleScale);
+    const bubbleW = Math.max(128, 136 * bubbleScale);
+    const bubbleY = nameY - namePlateH - bubbleH - 10;
 
     const jitter = t.angerMultiplier > 1.3 ? (Math.random() - 0.5) * 3 : Math.sin(performance.now() * 0.006) * 2;
     ctx.translate(0, jitter);
 
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    ctx.shadowBlur = 6;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+    ctx.shadowBlur = 5;
     ctx.fillStyle = t.angerMultiplier > 1.3 ? '#fef2f2' : '#ffffff';
-    ctx.strokeStyle = t.angerMultiplier > 1.3 ? '#ef4444' : '#1e293b';
+    ctx.strokeStyle = t.angerMultiplier > 1.3 ? '#ef4444' : '#0f172a';
     ctx.lineWidth = 2;
 
+    ctx.beginPath();
     ctx.roundRect(-bubbleW / 2, bubbleY, bubbleW, bubbleH, 8);
     ctx.fill();
     ctx.stroke();
@@ -1139,8 +1146,9 @@ export class TowerDefenseGame {
     ctx.fill();
     ctx.stroke();
 
+    ctx.shadowBlur = 0;
     ctx.fillStyle = t.angerMultiplier > 1.3 ? '#dc2626' : '#0f172a';
-    ctx.font = `bold ${Math.max(10, 12 * bubbleScale)}px sans-serif`;
+    ctx.font = `bold ${Math.max(11, 13 * bubbleScale)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(bubbleText, 0, bubbleY + bubbleH / 2);
