@@ -4,7 +4,7 @@
  */
 import { generateProblem, validateAnswer } from './generator.js';
 import { sound } from './audio.js';
-import { TEACHER_IMAGE_DATA } from './assets.js';
+import { TEACHER_IMAGE_DATA, BEAM_SPRITE_DATA } from './assets.js';
 
 // 古いブラウザ用 roundRect ポリフィル
 if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
@@ -67,11 +67,36 @@ export class TowerDefenseGame {
         this.teacher.imageLoaded = true;
       };
       this.teacher.image.src = TEACHER_IMAGE_DATA;
+      if (this.teacher.image.complete) {
+        this.teacher.imageLoaded = true;
+      }
+    }
+
+    // ビーム & 爆発 VFX スプライトシート (4x4, 16フレーム)
+    this.beamSprite = {
+      image: null,
+      loaded: false,
+      cols: 4,
+      rows: 4,
+      frameWidth: 128,
+      frameHeight: 128
+    };
+
+    if (typeof Image !== 'undefined' && BEAM_SPRITE_DATA) {
+      this.beamSprite.image = new Image();
+      this.beamSprite.image.onload = () => {
+        this.beamSprite.loaded = true;
+      };
+      this.beamSprite.image.src = BEAM_SPRITE_DATA;
+      if (this.beamSprite.image.complete) {
+        this.beamSprite.loaded = true;
+      }
     }
 
     this.currentProblem = null;
 
     this.projectiles = [];
+    this.spriteExplosions = [];
     this.particles = [];
     this.shockwaves = [];
     this.floatingTexts = [];
@@ -164,6 +189,7 @@ export class TowerDefenseGame {
     this.teacher.knockbackTimer = 0;
 
     this.projectiles = [];
+    this.spriteExplosions = [];
     this.particles = [];
     this.shockwaves = [];
     this.floatingTexts = [];
@@ -288,23 +314,56 @@ export class TowerDefenseGame {
 
     this.teacher.angerLevel = Math.max(0, this.teacher.angerLevel - 0.15);
 
-    sound.playHit();
-    this.triggerShake(12);
-    this.flashAlpha = 0.4;
-    this.player.castAnim = 1.0;
-
     const teacherPos = this.getTeacherRenderPosition();
 
+    // コンボに応じたビームのカラー・太さ・演出強化
+    let beamGlowColor = '#38bdf8'; // シアン
+    let beamCoreColor = '#e0f2fe';
+    let beamWidth = 26;
+    let shakePower = 15;
+    let flashPower = 0.35;
+
+    if (this.combo >= 6) {
+      // ハイパーコンボ: ソーラーゴールド＆虹色プラズマ
+      beamGlowColor = '#f59e0b';
+      beamCoreColor = '#fef08a';
+      beamWidth = 48;
+      shakePower = 25;
+      flashPower = 0.65;
+    } else if (this.combo >= 3) {
+      // ミドルコンボ: アメジスト＆マゼンタ
+      beamGlowColor = '#a855f7';
+      beamCoreColor = '#f472b6';
+      beamWidth = 34;
+      shakePower = 18;
+      flashPower = 0.45;
+    }
+
+    sound.playHit();
+    this.triggerShake(shakePower);
+    this.flashAlpha = flashPower;
+    this.player.castAnim = 1.0;
+
+    const startX = this.player.x + 15;
+    const startY = this.player.y - 20;
+    const targetX = teacherPos.x;
+    const targetY = teacherPos.y - 25;
+
     this.projectiles.push({
-      startX: this.player.x,
-      startY: this.player.y,
-      targetX: teacherPos.x,
-      targetY: teacherPos.y,
-      x: this.player.x,
-      y: this.player.y,
+      startX,
+      startY,
+      targetX,
+      targetY,
+      x: startX,
+      y: startY,
       progress: 0,
-      color: '#60a5fa',
-      size: 14
+      speed: 4.5,
+      beamWidth,
+      glowColor: beamGlowColor,
+      coreColor: beamCoreColor,
+      lightningBolts: this.generateLightningPoints(startX, startY, targetX, targetY),
+      combo: this.combo,
+      hitTriggered: false
     });
 
     this.floatingTexts.push({
@@ -481,6 +540,76 @@ export class TowerDefenseGame {
     });
   }
 
+  generateLightningPoints(x1, y1, x2, y2, segments = 12, jitter = 18) {
+    const points = [];
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      let x = x1 + dx * t;
+      let y = y1 + dy * t;
+      if (i > 0 && i < segments) {
+        const offset = (Math.random() - 0.5) * 2 * jitter;
+        x += nx * offset;
+        y += ny * offset;
+      }
+      points.push({ x, y });
+    }
+    return points;
+  }
+
+  createBeamImpact(x, y, color, combo = 1) {
+    // 1. スプライト爆発アニメーション（コマ4〜15）
+    this.spriteExplosions.push({
+      x: x,
+      y: y,
+      frame: 4,
+      maxFrame: 15,
+      timer: 0,
+      frameDuration: 0.032,
+      scale: 1.5 + Math.min(1.0, (combo - 1) * 0.2),
+      rotation: (Math.random() - 0.5) * 0.5,
+      color: color
+    });
+
+    // 2. 四方八方に飛び散るプラズマスパーク粒子（35〜60個）
+    const count = 35 + Math.min(30, (combo - 1) * 6);
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 9 + 3;
+      this.particles.push({
+        x: x,
+        y: y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 1.5,
+        size: Math.random() * 6 + 2,
+        color: i % 2 === 0 ? color : '#ffffff',
+        alpha: 1.0,
+        decay: Math.random() * 0.04 + 0.025
+      });
+    }
+
+    // 3. 多重ショックウェーブリング
+    this.shockwaves.push({
+      x: x,
+      y: y,
+      radius: 14,
+      color: color,
+      alpha: 1.0
+    });
+    this.shockwaves.push({
+      x: x,
+      y: y,
+      radius: 6,
+      color: '#ffffff',
+      alpha: 0.95
+    });
+  }
+
   getTeacherRenderPosition() {
     const progress = Math.max(0, Math.min(1, 1.0 - (this.teacher.distance / 100.0)));
     const x = this.pathStart.x + (this.pathEnd.x - this.pathStart.x) * progress;
@@ -535,10 +664,28 @@ export class TowerDefenseGame {
 
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
-      p.progress += dt * 4.0;
+      p.progress += dt * 4.5;
       p.x = p.startX + (p.targetX - p.startX) * p.progress;
       p.y = p.startY + (p.targetY - p.startY) * p.progress;
-      if (p.progress >= 1.0) this.projectiles.splice(i, 1);
+      if (p.progress >= 1.0) {
+        if (!p.hitTriggered) {
+          p.hitTriggered = true;
+          this.createBeamImpact(p.targetX, p.targetY, p.glowColor, p.combo || 1);
+        }
+        this.projectiles.splice(i, 1);
+      }
+    }
+
+    for (let i = this.spriteExplosions.length - 1; i >= 0; i--) {
+      const exp = this.spriteExplosions[i];
+      exp.timer += dt;
+      if (exp.timer >= exp.frameDuration) {
+        exp.timer -= exp.frameDuration;
+        exp.frame++;
+        if (exp.frame > exp.maxFrame) {
+          this.spriteExplosions.splice(i, 1);
+        }
+      }
     }
 
     for (let i = this.particles.length - 1; i >= 0; i--) {
@@ -665,6 +812,7 @@ export class TowerDefenseGame {
     this.renderAmbientSparks(ctx);
     this.renderTeacher(ctx);
     this.renderProjectiles(ctx);
+    this.renderSpriteExplosions(ctx);
     this.renderParticles(ctx);
     this.renderShockwaves(ctx);
     this.renderPlayer(ctx);
@@ -940,21 +1088,181 @@ export class TowerDefenseGame {
   }
 
   renderProjectiles(ctx) {
+    if (!this.projectiles || this.projectiles.length === 0) return;
     ctx.save();
+    // ネオン発光成分を加算合成で極めて鮮やかに描画
+    ctx.globalCompositeOperation = 'lighter';
+
     for (const p of this.projectiles) {
-      ctx.shadowColor = p.color;
-      ctx.shadowBlur = 15;
-      ctx.fillStyle = p.color;
+      const startX = p.startX;
+      const startY = p.startY;
+      const currentX = p.x;
+      const currentY = p.y;
+      const glowColor = p.glowColor || '#38bdf8';
+      const coreColor = p.coreColor || '#e0f2fe';
+      const beamWidth = p.beamWidth || 28;
+
+      // 1. マズルフラッシュ（魔法陣先端の強烈な放射光球と光芒）
+      const muzzleGrad = ctx.createRadialGradient(startX, startY, 2, startX, startY, beamWidth * 1.5);
+      muzzleGrad.addColorStop(0, '#ffffff');
+      muzzleGrad.addColorStop(0.3, coreColor);
+      muzzleGrad.addColorStop(0.7, glowColor);
+      muzzleGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = muzzleGrad;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.arc(startX, startY, beamWidth * 1.5, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = 'rgba(147, 197, 253, 0.5)';
-      ctx.lineWidth = p.size * 0.7;
+      // 十字スターフレア
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.moveTo(p.startX, p.startY);
-      ctx.lineTo(p.x, p.y);
+      ctx.moveTo(startX - beamWidth * 1.8, startY);
+      ctx.lineTo(startX + beamWidth * 1.8, startY);
+      ctx.moveTo(startX, startY - beamWidth * 1.8);
+      ctx.lineTo(startX, startY + beamWidth * 1.8);
       ctx.stroke();
+
+      // 2. 多重プラズマレーザー主砲
+      // レイヤーA: 巨大アウターグローオーラ
+      ctx.save();
+      ctx.strokeStyle = glowColor;
+      ctx.lineWidth = beamWidth * 1.6;
+      ctx.shadowColor = glowColor;
+      ctx.shadowBlur = 25;
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(currentX, currentY);
+      ctx.stroke();
+      ctx.restore();
+
+      // レイヤーB: インナービームボディ
+      ctx.save();
+      ctx.strokeStyle = coreColor;
+      ctx.lineWidth = beamWidth * 0.7;
+      ctx.shadowColor = coreColor;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(currentX, currentY);
+      ctx.stroke();
+      ctx.restore();
+
+      // レイヤーC: 超高熱ホワイトコア
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = Math.max(3, beamWidth * 0.25);
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(currentX, currentY);
+      ctx.stroke();
+
+      // 3. レーザーに巻き付く放電稲妻ボルト（2本の暴れる電撃）
+      for (let b = 0; b < 2; b++) {
+        const jitterAmount = 14 + b * 8;
+        const lightning = this.generateLightningPoints(startX, startY, currentX, currentY, 10, jitterAmount);
+        ctx.strokeStyle = b === 0 ? '#ffffff' : coreColor;
+        ctx.lineWidth = b === 0 ? 2.0 : 3.0;
+        ctx.beginPath();
+        if (lightning.length > 0) {
+          ctx.moveTo(lightning[0].x, lightning[0].y);
+          for (let j = 1; j < lightning.length; j++) {
+            ctx.lineTo(lightning[j].x, lightning[j].y);
+          }
+        }
+        ctx.stroke();
+      }
+
+      // 4. 先端スプライトヘッド（スプライトシート コマ0〜3の回転エネルギー渦）
+      if (this.beamSprite && this.beamSprite.loaded && this.beamSprite.image) {
+        const headFrame = Math.floor(performance.now() * 0.018) % 4;
+        const fw = this.beamSprite.frameWidth;
+        const fh = this.beamSprite.frameHeight;
+        const inset = 8;
+        const sx = headFrame * fw + inset;
+        const sy = inset;
+        const sw = fw - inset * 2;
+        const sh = fh - inset * 2;
+        const headSize = Math.max(80, beamWidth * 3.2);
+
+        ctx.save();
+        ctx.translate(currentX, currentY);
+        ctx.rotate(performance.now() * 0.006);
+
+        // 円形マスクでセルの四隅のコマ番号やグリッド線を完全に遮断
+        ctx.beginPath();
+        ctx.arc(0, 0, headSize * 0.48, 0, Math.PI * 2);
+        ctx.clip();
+
+        ctx.drawImage(
+          this.beamSprite.image,
+          sx, sy, sw, sh,
+          -headSize / 2, -headSize / 2, headSize, headSize
+        );
+        ctx.restore();
+      } else {
+        // スプライト未読み込み時のフォールバック発光球
+        const headGrad = ctx.createRadialGradient(currentX, currentY, 4, currentX, currentY, beamWidth * 1.6);
+        headGrad.addColorStop(0, '#ffffff');
+        headGrad.addColorStop(0.4, coreColor);
+        headGrad.addColorStop(0.8, glowColor);
+        headGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = headGrad;
+        ctx.beginPath();
+        ctx.arc(currentX, currentY, beamWidth * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  renderSpriteExplosions(ctx) {
+    if (!this.spriteExplosions || this.spriteExplosions.length === 0) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    for (const exp of this.spriteExplosions) {
+      if (this.beamSprite && this.beamSprite.loaded && this.beamSprite.image) {
+        const col = exp.frame % this.beamSprite.cols;
+        const row = Math.floor(exp.frame / this.beamSprite.cols);
+        const fw = this.beamSprite.frameWidth;
+        const fh = this.beamSprite.frameHeight;
+        const inset = 8;
+        const sx = col * fw + inset;
+        const sy = row * fh + inset;
+        const sw = fw - inset * 2;
+        const sh = fh - inset * 2;
+        const drawSize = 150 * (exp.scale || 1.5);
+
+        ctx.save();
+        ctx.translate(exp.x, exp.y);
+        ctx.rotate(exp.rotation || 0);
+
+        // 円形マスクでセルの四隅のコマ番号や境界グリッド線を完全除去
+        ctx.beginPath();
+        ctx.arc(0, 0, drawSize * 0.44, 0, Math.PI * 2);
+        ctx.clip();
+
+        ctx.drawImage(
+          this.beamSprite.image,
+          sx, sy, sw, sh,
+          -drawSize / 2, -drawSize / 2, drawSize, drawSize
+        );
+
+        ctx.restore();
+      } else {
+        // 画像未完了時のフォールバック爆発描画
+        ctx.save();
+        ctx.translate(exp.x, exp.y);
+        const progress = Math.min(1, Math.max(0, (exp.frame - 4) / 12));
+        const radius = (35 + progress * 75) * (exp.scale || 1.0);
+        const alpha = Math.max(0, 1.0 - progress);
+        ctx.fillStyle = exp.color || '#38bdf8';
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
     }
     ctx.restore();
   }
