@@ -4,7 +4,7 @@
  */
 import { generateProblem, validateAnswer } from './generator.js';
 import { sound } from './audio.js';
-import { TEACHER_IMAGE_DATA, BEAM_SPRITE_DATA } from './assets.js';
+import { TEACHER_IMAGE_DATA, BEAM_SPRITE_DATA, HOUSE_IMAGE_DATA, CHILD_SPRITE_DATA } from './assets.js';
 
 // 古いブラウザ用 roundRect ポリフィル
 if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
@@ -93,6 +93,64 @@ export class TowerDefenseGame {
       }
     }
 
+    // わが家イラスト画像 (512x512)
+    this.houseImage = null;
+    this.houseImageLoaded = false;
+    if (typeof Image !== 'undefined' && HOUSE_IMAGE_DATA) {
+      this.houseImage = new Image();
+      this.houseImage.onload = () => {
+        this.houseImageLoaded = true;
+      };
+      this.houseImage.src = HOUSE_IMAGE_DATA;
+      if (this.houseImage.complete) {
+        this.houseImageLoaded = true;
+      }
+    }
+
+    // 子供の後ろ姿スプライト (512x256, 2フレーム: 0=待機, 1=攻撃魔法詠唱)
+    this.childSprite = {
+      image: null,
+      canvas: null,
+      loaded: false,
+      frameWidth: 256,
+      frameHeight: 256,
+      totalFrames: 2
+    };
+
+    if (typeof Image !== 'undefined' && CHILD_SPRITE_DATA) {
+      this.childSprite.image = new Image();
+      const processChildTransparency = () => {
+        try {
+          if (typeof document !== 'undefined') {
+            const c = document.createElement('canvas');
+            c.width = this.childSprite.image.naturalWidth || 512;
+            c.height = this.childSprite.image.naturalHeight || 256;
+            const cCtx = c.getContext('2d');
+            cCtx.drawImage(this.childSprite.image, 0, 0);
+            const imgData = cCtx.getImageData(0, 0, c.width, c.height);
+            const d = imgData.data;
+            for (let i = 0; i < d.length; i += 4) {
+              // 暗い背景（RGB各値 < 30）を完全透明化
+              if (d[i] < 30 && d[i + 1] < 30 && d[i + 2] < 30) {
+                d[i + 3] = 0;
+              }
+            }
+            cCtx.putImageData(imgData, 0, 0);
+            this.childSprite.canvas = c;
+          }
+        } catch (e) {
+          // フォールバック: そのままの Image を利用
+        }
+        this.childSprite.loaded = true;
+      };
+
+      this.childSprite.image.onload = processChildTransparency;
+      this.childSprite.image.src = CHILD_SPRITE_DATA;
+      if (this.childSprite.image.complete && this.childSprite.image.naturalWidth > 0) {
+        processChildTransparency();
+      }
+    }
+
     this.currentProblem = null;
 
     this.projectiles = [];
@@ -119,7 +177,8 @@ export class TowerDefenseGame {
       y: 330,
       ringAngle1: 0,
       ringAngle2: 0,
-      castAnim: 0
+      castAnim: 0,
+      breathTime: 0
     };
 
     this.lastTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -344,8 +403,8 @@ export class TowerDefenseGame {
     this.flashAlpha = flashPower;
     this.player.castAnim = 1.0;
 
-    const startX = this.player.x + 15;
-    const startY = this.player.y - 20;
+    const startX = this.player.x + 58;
+    const startY = this.player.y - 24;
     const targetX = teacherPos.x;
     const targetY = teacherPos.y - 25;
 
@@ -716,6 +775,7 @@ export class TowerDefenseGame {
 
     this.player.ringAngle1 += dt * 1.5;
     this.player.ringAngle2 -= dt * 2.0;
+    this.player.breathTime = (this.player.breathTime || 0) + dt * 2.5;
     if (this.player.castAnim > 0) {
       this.player.castAnim = Math.max(0, this.player.castAnim - dt * 2.5);
     }
@@ -1006,81 +1066,161 @@ export class TowerDefenseGame {
     ctx.save();
     ctx.translate(this.player.x, this.player.y);
 
-    // 1. おうち（玄関ドア）の描画
-    // 壁
-    ctx.fillStyle = '#334155';
-    ctx.roundRect(-45, -75, 90, 85, 4);
-    ctx.fill();
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    // 1. わが家（玄関・ポーチ・表札）の描画
+    if (this.houseImage && this.houseImageLoaded) {
+      // AI生成の美麗なわが家イラスト (ポーチ、玄関灯、表札「わが家」、石畳)
+      const houseW = 160;
+      const houseH = 160;
+      const houseX = -80;
+      const houseY = -145;
 
-    // 三角屋根
-    ctx.fillStyle = '#b91c1c';
-    ctx.beginPath();
-    ctx.moveTo(-55, -75);
-    ctx.lineTo(0, -110);
-    ctx.lineTo(55, -75);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#f87171';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // 玄関ドア
-    ctx.fillStyle = '#78350f';
-    ctx.roundRect(-22, -65, 44, 75, 4);
-    ctx.fill();
-    ctx.strokeStyle = '#b45309';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // ドアノブ
-    ctx.fillStyle = '#fbbf24';
-    ctx.beginPath();
-    ctx.arc(14, -28, 4, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 表札「わが家」
-    ctx.fillStyle = '#fef3c7';
-    ctx.fillRect(-16, -60, 32, 12);
-    ctx.strokeStyle = '#92400e';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(-16, -60, 32, 12);
-    ctx.fillStyle = '#78350f';
-    ctx.font = 'bold 8px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('わが家', 0, -51);
-
-    // 2. プレイヤー魔法陣エフェクト
-    ctx.save();
-    ctx.translate(15, -15);
-    ctx.rotate(this.player.ringAngle1);
-    ctx.strokeStyle = 'rgba(99, 102, 241, 0.8)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(-20, -20, 40, 40);
-    ctx.restore();
-
-    ctx.save();
-    ctx.translate(15, -15);
-    ctx.rotate(this.player.ringAngle2);
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, 24, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-
-    // 魔法弾詠唱時のオーラパルス
-    if (this.player.castAnim > 0) {
       ctx.save();
-      ctx.translate(15, -15);
-      ctx.fillStyle = `rgba(96, 165, 250, ${this.player.castAnim * 0.7})`;
-      ctx.shadowColor = '#60a5fa';
-      ctx.shadowBlur = 25 * this.player.castAnim;
+      // 角丸と周囲のやわらかなシャドウ
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+      ctx.shadowBlur = 12;
       ctx.beginPath();
-      ctx.arc(0, 0, 30 * this.player.castAnim, 0, Math.PI * 2);
+      ctx.roundRect(houseX, houseY, houseW, houseH, 8);
+      ctx.clip();
+      ctx.drawImage(this.houseImage, houseX, houseY, houseW, houseH);
+      ctx.restore();
+
+      // わが家の外枠（夜景になじむシックな境界線）
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(houseX, houseY, houseW, houseH, 8);
+      ctx.stroke();
+
+      // 玄関灯のほのかな暖色グロー
+      const lanternGrad = ctx.createRadialGradient(houseX + 90, houseY + 65, 5, houseX + 90, houseY + 65, 45);
+      lanternGrad.addColorStop(0, 'rgba(253, 224, 71, 0.35)');
+      lanternGrad.addColorStop(1, 'rgba(253, 224, 71, 0)');
+      ctx.fillStyle = lanternGrad;
+      ctx.beginPath();
+      ctx.arc(houseX + 90, houseY + 65, 45, 0, Math.PI * 2);
       ctx.fill();
+    } else {
+      // フォールバック（画像未ロード時）
+      ctx.fillStyle = '#334155';
+      ctx.roundRect(-45, -75, 90, 85, 4);
+      ctx.fill();
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#b91c1c';
+      ctx.beginPath();
+      ctx.moveTo(-55, -75);
+      ctx.lineTo(0, -110);
+      ctx.lineTo(55, -75);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#78350f';
+      ctx.roundRect(-22, -65, 44, 75, 4);
+      ctx.fill();
+
+      ctx.fillStyle = '#fef3c7';
+      ctx.fillRect(-16, -60, 32, 12);
+      ctx.fillStyle = '#78350f';
+      ctx.font = 'bold 8px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('わが家', 0, -51);
+    }
+
+    // 2. 子供キャラクター（後ろ姿＆ランドセル）の描画
+    // 配置基準: 玄関ポーチのステップ前（x: 35, y: -10）
+    const childBaseX = 35;
+    const childBaseY = -10;
+    const childSize = 78;
+
+    // 待機時の微細な呼吸上下運動
+    const breathOffset = Math.sin(this.player.breathTime || 0) * 1.5;
+
+    // 詠唱時のリコイル（発射の瞬間後方に踏ん張り、前へ戻る）
+    const isCasting = this.player.castAnim > 0;
+    const recoilX = isCasting ? -Math.sin(this.player.castAnim * Math.PI) * 7 : 0;
+    const recoilY = isCasting ? Math.sin(this.player.castAnim * Math.PI) * 2 : 0;
+
+    const childDrawX = childBaseX + recoilX - childSize / 2;
+    const childDrawY = childBaseY + recoilY + (isCasting ? 0 : breathOffset) - childSize / 2;
+
+    // 子供の足元の影（楕円シャドウ）
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(childBaseX + recoilX, childBaseY + 28, 20, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // 子供スプライトの描画
+    const childSource = this.childSprite.canvas || this.childSprite.image;
+    if (childSource && this.childSprite.loaded) {
+      // フレーム選択: 0 = 待機, 1 = 攻撃魔法ポーズ
+      const frameIdx = isCasting ? 1 : 0;
+      const sw = 256;
+      const sh = 256;
+      const sx = frameIdx * sw;
+      const sy = 0;
+
+      ctx.drawImage(childSource, sx, sy, sw, sh, childDrawX, childDrawY, childSize, childSize);
+    } else {
+      // スプライト未ロード時は待機
+    }
+
+    // 3. プレイヤー魔法陣 & 詠唱オーラ演出
+    // 右手の位置（攻撃ポーズ時に手を右上方向へ突き出している位置）
+    const handX = isCasting ? (childBaseX + recoilX + 23) : (childBaseX + 12);
+    const handY = isCasting ? (childBaseY + recoilY - 14) : (childBaseY - 6 + breathOffset);
+
+    // 回転する二重魔法陣（右手付近に展開）
+    ctx.save();
+    ctx.translate(handX, handY);
+    ctx.rotate(this.player.ringAngle1);
+    ctx.strokeStyle = isCasting ? 'rgba(168, 85, 247, 0.85)' : 'rgba(99, 102, 241, 0.6)';
+    ctx.lineWidth = isCasting ? 2.5 : 1.5;
+    const ringSize = isCasting ? 22 : 16;
+    ctx.strokeRect(-ringSize / 2, -ringSize / 2, ringSize, ringSize);
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(handX, handY);
+    ctx.rotate(this.player.ringAngle2);
+    ctx.strokeStyle = isCasting ? 'rgba(56, 189, 248, 0.95)' : 'rgba(56, 189, 248, 0.5)';
+    ctx.lineWidth = isCasting ? 2 : 1.2;
+    ctx.beginPath();
+    ctx.arc(0, 0, isCasting ? 18 : 12, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // 魔法弾詠唱時のオーラパルス & マズルフラッシュ
+    if (isCasting) {
+      ctx.save();
+      ctx.translate(handX, handY);
+      ctx.globalCompositeOperation = 'lighter';
+
+      // 輝く魔力球
+      const auraGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 32 * this.player.castAnim);
+      auraGrad.addColorStop(0, '#ffffff');
+      auraGrad.addColorStop(0.3, 'rgba(56, 189, 248, 0.9)');
+      auraGrad.addColorStop(0.7, 'rgba(147, 51, 234, 0.5)');
+      auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = auraGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, 32 * this.player.castAnim, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 十字スターフレア
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.lineWidth = 2 * this.player.castAnim;
+      const flareLen = 28 * this.player.castAnim;
+      ctx.beginPath();
+      ctx.moveTo(-flareLen, 0);
+      ctx.lineTo(flareLen, 0);
+      ctx.moveTo(0, -flareLen);
+      ctx.lineTo(0, flareLen);
+      ctx.stroke();
+
       ctx.restore();
     }
 
