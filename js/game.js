@@ -679,27 +679,39 @@ export class TowerDefenseGame {
     const w = (this.canvas && this.canvas.width) || 1024;
     const h = (this.canvas && this.canvas.height) || 573;
 
-    // ピクセルアート坂道に合わせた2次ベジェ曲線パス
-    // 距離80m以上（初期）: 坂道奥（右上）
-    // 距離0m（限界）: 我が家前道路（左下、男の子の前）
+    // 道路のアスファルト中央を正確に通るウェイポイント（比率座標）
+    // 進行度 progress = 0.0 (最遠 80m) 〜 1.0 (我が家玄関前 0m)
+    const waypoints = [
+      { t: 0.00, x: 0.81, y: 0.22, scale: 0.35 }, // 坂の頂上（ガードレール内側）
+      { t: 0.20, x: 0.86, y: 0.33, scale: 0.45 }, // 坂上部（右カーブアスファルト中央）
+      { t: 0.45, x: 0.86, y: 0.47, scale: 0.58 }, // 坂中腹（広いアスファルト中央）
+      { t: 0.65, x: 0.77, y: 0.62, scale: 0.72 }, // ガードレールが途切れる手前のアスファルト
+      { t: 0.82, x: 0.60, y: 0.76, scale: 0.85 }, // 坂を下りきって我が家前道路へ曲がる
+      { t: 1.00, x: 0.42, y: 0.83, scale: 1.00 }  // 男の子の前（家庭訪問突入）
+    ];
+
     const progress = Math.max(0, Math.min(1.0, (80.0 - this.teacher.distance) / 80.0));
-    const t = progress;
-    const invT = 1.0 - t;
 
-    // 制御点
-    const p0 = { x: w * 0.83, y: h * 0.23, scale: 0.38 }; // 奥
-    const p1 = { x: w * 0.63, y: h * 0.44 };               // カーブ中腹
-    const p2 = { x: w * 0.40, y: h * 0.74, scale: 0.95 }; // 玄関前
+    // 区間検索と滑らかな補間（Smoothstep）
+    let i = 0;
+    while (i < waypoints.length - 1 && progress > waypoints[i + 1].t) {
+      i++;
+    }
+    const pA = waypoints[i];
+    const pB = waypoints[Math.min(waypoints.length - 1, i + 1)];
+    const segRange = pB.t - pA.t;
+    const segT = segRange > 0 ? (progress - pA.t) / segRange : 0;
+    const smoothT = segT * segT * (3 - 2 * segT);
 
-    let x = invT * invT * p0.x + 2 * invT * t * p1.x + t * t * p2.x;
-    let y = invT * invT * p0.y + 2 * invT * t * p1.y + t * t * p2.y;
-    const scale = p0.scale + (p2.scale - p0.scale) * t;
+    let x = (pA.x + (pB.x - pA.x) * smoothT) * w;
+    let y = (pA.y + (pB.y - pA.y) * smoothT) * h;
+    const scale = pA.scale + (pB.scale - pA.scale) * smoothT;
 
     // ノックバック演出（上流方向・斜め右上へ押し戻される）
     if (this.teacher.knockbackTimer > 0) {
-      const kb = this.teacher.knockbackTimer * 30 * scale;
-      x += kb * 0.8;
-      y -= kb * 0.55;
+      const kb = this.teacher.knockbackTimer * 28 * scale;
+      x += kb * 0.75;
+      y -= kb * 0.5;
     }
 
     // 歩行の上下揺れ
@@ -1035,24 +1047,19 @@ export class TowerDefenseGame {
     ctx.fill();
     ctx.restore();
 
-    // 2. 怒りオーラ（作成イメージ.jpg の黒・紫のオーラ）
+    // 2. 怒り演出（黒い楕円は描かず、スプライト背後を赤〜紫に発光）
     if (t.angerLevel > 0.05 || t.angerMultiplier > 1.1) {
       ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
       const auraPulse = (Math.sin(performance.now() * 0.01) + 1) * 0.5;
-      const isEnraged = t.angerMultiplier > 1.4;
-      ctx.shadowColor = isEnraged ? '#ef4444' : '#a855f7';
-      ctx.shadowBlur = 25 * pos.scale + auraPulse * 15;
-      ctx.fillStyle = isEnraged ? 'rgba(220, 38, 38, 0.45)' : 'rgba(88, 28, 135, 0.55)';
+      const isEnraged = t.angerMultiplier > 1.3;
+      const glowGrad = ctx.createRadialGradient(0, -baseH * 0.5, 5, 0, -baseH * 0.5, baseW * 0.8 + auraPulse * 10);
+      glowGrad.addColorStop(0, isEnraged ? 'rgba(239, 68, 68, 0.45)' : 'rgba(168, 85, 247, 0.35)');
+      glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = glowGrad;
       ctx.beginPath();
-      ctx.ellipse(0, -baseH * 0.5, baseW * 0.65 + auraPulse * 8, baseH * 0.55 + auraPulse * 8, 0, 0, Math.PI * 2);
+      ctx.arc(0, -baseH * 0.5, baseW * 0.8 + auraPulse * 10, 0, Math.PI * 2);
       ctx.fill();
-
-      // 黒い衝撃波フレア
-      ctx.strokeStyle = 'rgba(15, 23, 42, 0.7)';
-      ctx.lineWidth = 3 * pos.scale;
-      ctx.beginPath();
-      ctx.ellipse(0, -baseH * 0.5, baseW * 0.75 + auraPulse * 10, baseH * 0.6 + auraPulse * 10, 0, 0, Math.PI * 2);
-      ctx.stroke();
       ctx.restore();
     }
 
@@ -1078,59 +1085,65 @@ export class TowerDefenseGame {
       ctx.fillStyle = '#ffffff';
       ctx.font = `bold ${Math.max(12, 14 * pos.scale)}px sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText('ワタナベ先生', 0, -baseH * 0.5);
+      ctx.fillText('渡部先生', 0, -baseH * 0.5);
     }
 
-    if (this.currentProblem) {
-      const f1 = this.currentProblem.fraction1;
-      const f2 = this.currentProblem.fraction2;
-      const op = this.currentProblem.opSymbol || (this.currentProblem.isAddition ? '+' : '−');
-      const f1Str = f1.whole ? `${f1.whole}と${f1.num}/${f1.den}` : `${f1.num}/${f1.den}`;
-      const f2Str = f2.whole ? `${f2.whole}と${f2.num}/${f2.den}` : `${f2.num}/${f2.den}`;
-      const probStr = `${f1Str} ${op} ${f2Str} = ?`;
-
-      ctx.save();
-      const bubbleW = Math.max(130, 160 * Math.min(1.2, pos.scale));
-      const bubbleH = 34 * Math.min(1.2, pos.scale);
-      const bubbleY = -baseH - bubbleH - 12;
-
-      ctx.shadowColor = '#000000';
-      ctx.shadowBlur = 8;
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-      ctx.strokeStyle = t.angerMultiplier > 1.3 ? '#ef4444' : '#6366f1';
-      ctx.lineWidth = 2.5;
-
-      ctx.roundRect(-bubbleW / 2, bubbleY, bubbleW, bubbleH, 10);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(-6, bubbleY + bubbleH);
-      ctx.lineTo(0, bubbleY + bubbleH + 8);
-      ctx.lineTo(6, bubbleY + bubbleH);
-      ctx.closePath();
-      ctx.fillStyle = ctx.strokeStyle;
-      ctx.fill();
-
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = `bold ${Math.max(11, 14 * Math.min(1.2, pos.scale))}px monospace`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(probStr, 0, bubbleY + bubbleH / 2);
-      ctx.restore();
-    }
-
+    // 4. ネームプレート「渡部先生」
     ctx.save();
-    const nameY = -baseH - 4;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.roundRect(-45 * pos.scale, nameY - 14, 90 * pos.scale, 16, 4);
+    const nameY = -baseH - 6;
+    const namePlateW = Math.max(75, 85 * pos.scale);
+    const namePlateH = Math.max(16, 18 * pos.scale);
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+    ctx.strokeStyle = t.angerMultiplier > 1.3 ? '#ef4444' : '#6366f1';
+    ctx.lineWidth = 1.5;
+    ctx.roundRect(-namePlateW / 2, nameY - namePlateH, namePlateW, namePlateH, 4);
     ctx.fill();
+    ctx.stroke();
 
     ctx.fillStyle = t.angerMultiplier > 1.3 ? '#fca5a5' : '#fef08a';
-    ctx.font = `bold ${Math.max(9, 11 * pos.scale)}px sans-serif`;
+    ctx.font = `bold ${Math.max(10, 12 * pos.scale)}px sans-serif`;
     ctx.textAlign = 'center';
-    const stateTitle = t.angerMultiplier > 1.3 ? '🔥激怒接近中！' : '家庭訪問 担任';
-    ctx.fillText(stateTitle, 0, nameY - 3);
+    ctx.textBaseline = 'middle';
+    const teacherName = t.angerMultiplier > 1.3 ? '🔥 渡部先生' : '渡部先生';
+    ctx.fillText(teacherName, 0, nameY - namePlateH / 2);
+    ctx.restore();
+
+    // 5. 吹き出し「家庭訪問じゃぁ～」
+    ctx.save();
+    const bubbleText = t.angerMultiplier > 1.3 ? '家庭訪問じゃぁ〜!!' : '家庭訪問じゃぁ～';
+    const bubbleScale = Math.min(1.2, Math.max(0.85, pos.scale));
+    const bubbleH = 26 * bubbleScale;
+    const bubbleW = 126 * bubbleScale;
+    const bubbleY = nameY - namePlateH - bubbleH - 8;
+
+    const jitter = t.angerMultiplier > 1.3 ? (Math.random() - 0.5) * 3 : Math.sin(performance.now() * 0.006) * 2;
+    ctx.translate(0, jitter);
+
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = t.angerMultiplier > 1.3 ? '#fef2f2' : '#ffffff';
+    ctx.strokeStyle = t.angerMultiplier > 1.3 ? '#ef4444' : '#1e293b';
+    ctx.lineWidth = 2;
+
+    ctx.roundRect(-bubbleW / 2, bubbleY, bubbleW, bubbleH, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    // フキダシのしっぽ
+    ctx.beginPath();
+    ctx.moveTo(-5, bubbleY + bubbleH);
+    ctx.lineTo(0, bubbleY + bubbleH + 6);
+    ctx.lineTo(5, bubbleY + bubbleH);
+    ctx.closePath();
+    ctx.fillStyle = ctx.fillStyle;
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = t.angerMultiplier > 1.3 ? '#dc2626' : '#0f172a';
+    ctx.font = `bold ${Math.max(10, 12 * bubbleScale)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(bubbleText, 0, bubbleY + bubbleH / 2);
     ctx.restore();
 
     ctx.restore();
