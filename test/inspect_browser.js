@@ -32,8 +32,8 @@ async function run() {
   });
   await new Promise(resolve => server.listen(8888, resolve));
 
-  const targetUrl = 'https://yukileno.github.io/fraction-tower-defense/';
-  console.log('Launching browser with target URL...', targetUrl);
+  const targetUrl = 'http://localhost:8888/index.html';
+  console.log('Launching browser with local URL...', targetUrl);
   const browser = spawn(edgePath, [
     '--headless=new',
     '--remote-debugging-port=9222',
@@ -164,6 +164,46 @@ async function run() {
                 returnByValue: true
               });
               send('Page.captureScreenshot', { format: 'png' });
+
+              // 4. 正解を入力してEnterを押し、押し返しノックバックエフェクトを撮影
+              setTimeout(() => {
+                console.log('Answering problem to trigger magic knockback...');
+                send('Runtime.evaluate', {
+                  expression: `(() => {
+                    const prob = window.gameInstance.getCurrentProblem();
+                    const ans = prob.simplifiedResult;
+                    const numInput = document.getElementById("inputNum");
+                    const denInput = document.getElementById("inputDen");
+                    const attackBtn = document.getElementById("attackBtn");
+                    numInput.value = String(ans.num);
+                    denInput.value = String(ans.den);
+                    attackBtn.click();
+                    return { num: ans.num, den: ans.den };
+                  })()`
+                });
+
+                setTimeout(() => {
+                  console.log('Capturing knockback effect screenshot...');
+                  send('Page.captureScreenshot', { format: 'png' });
+
+                  // 5. ゲームオーバーを強制トリガーしてリザルト画面を撮影
+                  setTimeout(() => {
+                    console.log('Triggering game over to inspect review note...');
+                    send('Runtime.evaluate', {
+                      expression: `(() => {
+                        window.gameInstance.teacher.distance = 0;
+                        window.gameInstance.gameOver();
+                        return true;
+                      })()`
+                    });
+
+                    setTimeout(() => {
+                      console.log('Capturing game over modal screenshot...');
+                      send('Page.captureScreenshot', { format: 'png' });
+                    }, 1200);
+                  }, 2000);
+                }, 400);
+              }, 1500);
             }, 2000);
           }, 1500);
         }, 3500);
@@ -176,7 +216,13 @@ async function run() {
       }
       if (data.result.data) {
         shotIndex++;
-        const filenames = ['title_screen_cdp.png', 'ranking_modal_cdp.png', 'live_site_cdp.png'];
+        const filenames = [
+          'title_screen_cdp.png',
+          'ranking_modal_cdp.png',
+          'live_site_cdp.png',
+          'knockback_effect_cdp.png',
+          'game_over_cdp.png'
+        ];
         const name = filenames[shotIndex - 1] || `screen_${shotIndex}.png`;
         const buf = Buffer.from(data.result.data, 'base64');
         const outPath = path.join('C:\\Users\\yukil\\.gemini\\antigravity\\brain\\838fdd43-5d91-4bac-8e34-849bea01ba04', name);
@@ -193,8 +239,8 @@ async function run() {
     }
   };
 
-  // Wait 13 seconds to observe full flow
-  await new Promise(r => setTimeout(r, 13000));
+  // Wait 20 seconds to observe full flow
+  await new Promise(r => setTimeout(r, 20000));
 
   ws.close();
   browser.kill();

@@ -11,7 +11,7 @@ const canvas = document.getElementById('gameCanvas');
 const scratchCanvas = document.getElementById('scratchCanvas');
 
 // HUD 要素
-const livesDisplay = document.getElementById('livesDisplay');
+const distanceDisplay = document.getElementById('distanceDisplay');
 const scoreDisplay = document.getElementById('scoreDisplay');
 const highScoreDisplay = document.getElementById('highScoreDisplay');
 const waveDisplay = document.getElementById('waveDisplay');
@@ -57,6 +57,7 @@ const finalScoreDisplay = document.getElementById('finalScoreDisplay');
 const finalHighScoreDisplay = document.getElementById('finalHighScoreDisplay');
 const finalWaveDisplay = document.getElementById('finalWaveDisplay');
 const finalComboDisplay = document.getElementById('finalComboDisplay');
+const finalTimeDisplay = document.getElementById('finalTimeDisplay');
 const finalDefeatedDisplay = document.getElementById('finalDefeatedDisplay');
 const reviewListContainer = document.getElementById('reviewListContainer');
 const playerNameInput = document.getElementById('playerNameInput');
@@ -89,18 +90,28 @@ setTimeout(() => scratchpad.resize(), 100);
 
 // ゲームインスタンス初期化
 const game = new TowerDefenseGame(canvas, {
-  updateHUD: (status) => {
-    // ライフ表示
-    let hearts = '';
-    for (let i = 0; i < status.maxLives; i++) {
-      hearts += i < status.lives ? '❤️' : '🖤';
-    }
-    if (livesDisplay) livesDisplay.textContent = hearts;
+  distanceDisplay,
+  scoreDisplay,
+  highScoreDisplay,
+  waveDisplay,
+  mpBar,
+  mpText,
 
-    // スコア & ウェーブ & ハイスコア
+  updateHUD: (status) => {
+    // 玄関までの距離
+    if (distanceDisplay) {
+      distanceDisplay.textContent = `${status.distance.toFixed(1)}m`;
+      if (status.distance <= 15) {
+        distanceDisplay.classList.add('animate-ping', 'text-rose-500');
+      } else {
+        distanceDisplay.classList.remove('animate-ping');
+      }
+    }
+
+    // スコア & 到達段階 & ハイスコア
     if (scoreDisplay) scoreDisplay.textContent = status.score.toLocaleString();
     if (highScoreDisplay) highScoreDisplay.textContent = status.highScore.toLocaleString();
-    if (waveDisplay) waveDisplay.textContent = `ウェーブ ${status.wave}`;
+    if (waveDisplay) waveDisplay.textContent = `第${status.phase}段階 (${status.questionsCleared}問)`;
 
     // コンボバッジ
     if (comboBadge && comboText) {
@@ -119,7 +130,7 @@ const game = new TowerDefenseGame(canvas, {
 
     // 必殺技バッジ表示
     if (freezeSkillBadge) {
-      if (status.mp >= 50 && !game.isFrozen) {
+      if (status.mp >= 50 && !status.isFrozen) {
         freezeSkillBadge.classList.remove('opacity-50');
         freezeSkillBadge.classList.add('animate-pulse', 'border-sky-400', 'text-sky-200');
       } else {
@@ -139,12 +150,14 @@ const game = new TowerDefenseGame(canvas, {
     }
   },
 
-  onTargetChange: (monster) => {
-    if (!monster) {
-      renderProblem(null);
-      return;
+  onProblemChange: (problem) => {
+    renderProblem(problem);
+  },
+
+  onTargetChange: (target) => {
+    if (target && target.problem) {
+      renderProblem(target.problem);
     }
-    renderProblem(monster.problem);
   },
 
   onGameOver: (result) => {
@@ -431,9 +444,19 @@ function showGameOver(data) {
   lastGameResult = data;
   finalScoreDisplay.textContent = data.score.toLocaleString();
   finalHighScoreDisplay.textContent = data.highScore.toLocaleString();
-  finalWaveDisplay.textContent = data.wave;
+  finalWaveDisplay.textContent = data.wave || `第${data.phase}段階`;
   finalComboDisplay.textContent = `${data.maxCombo} 回`;
-  finalDefeatedDisplay.textContent = `${data.totalDefeated} 体`;
+
+  if (finalTimeDisplay) {
+    const elapsed = data.elapsedTime || 0;
+    const min = Math.floor(elapsed / 60);
+    const sec = elapsed % 60;
+    finalTimeDisplay.textContent = `${min}分${String(sec).padStart(2, '0')}秒`;
+  }
+
+  if (finalDefeatedDisplay) {
+    finalDefeatedDisplay.textContent = `${data.questionsCleared ?? data.totalDefeated ?? 0} 問`;
+  }
 
   // スコア登録欄のリセットとプレイヤー名の復元
   playerNameInput.value = ranking.getLastPlayerName() || '';
@@ -443,7 +466,7 @@ function showGameOver(data) {
   scoreSubmitStatus.textContent = '';
 
   reviewListContainer.innerHTML = '';
-  if (data.history.length === 0) {
+  if (!data.history || data.history.length === 0) {
     reviewListContainer.innerHTML = '<p class="text-slate-400 text-center py-4">出題履歴がありません</p>';
   } else {
     data.history.forEach((h, idx) => {
@@ -453,6 +476,9 @@ function showGameOver(data) {
       const p = h.problem;
       const ans = p.simplifiedResult;
       const mixedText = ans.toMixed().whole > 0 ? ` （帯分数: ${ans.toMixed().toString()}）` : '';
+      const userWholeText = h.userAnswer && h.userAnswer.whole > 0 ? `${h.userAnswer.whole}と` : '';
+      const userNum = h.userAnswer ? h.userAnswer.num : '?';
+      const userDen = h.userAnswer ? h.userAnswer.den : '?';
 
       card.innerHTML = `
         <div class="flex items-center justify-between mb-1">
@@ -462,7 +488,7 @@ function showGameOver(data) {
           </span>
         </div>
         <div class="text-[11px] text-slate-300 mb-1">
-          あなたの解答: <span class="font-bold text-white">${h.userAnswer.whole > 0 ? h.userAnswer.whole + 'と' : ''}${h.userAnswer.num}/${h.userAnswer.den}</span>
+          あなたの解答: <span class="font-bold text-white">${userWholeText}${userNum}/${userDen}</span>
           ／ 正しい答え: <span class="font-bold text-emerald-400">${ans.num}/${ans.den}${mixedText}</span>
         </div>
         <div class="text-[10px] bg-slate-900/80 p-2 rounded border border-slate-700 space-y-0.5 text-slate-300">
@@ -495,8 +521,8 @@ submitScoreBtn.addEventListener('click', async () => {
     await ranking.submitScore({
       name,
       score: lastGameResult.score,
-      wave: lastGameResult.wave,
-      defeated: lastGameResult.totalDefeated,
+      wave: lastGameResult.wave || `第${lastGameResult.phase}段階`,
+      defeated: `${lastGameResult.questionsCleared ?? lastGameResult.totalDefeated ?? 0}問`,
       combo: lastGameResult.maxCombo
     });
 
@@ -612,6 +638,7 @@ startGameBtn.addEventListener('click', () => {
 
 // 初期起動処理（ゲームは開始せず、タイトル待機）
 function initApp() {
+  window.gameInstance = game;
   setActiveInput(numInput);
   setTimeout(() => scratchpad.resize(), 200);
 }

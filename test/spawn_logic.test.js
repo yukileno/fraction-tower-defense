@@ -30,73 +30,118 @@ class MockCanvas {
   }
 }
 
-const mockUI = {
-  onHUDUpdate: () => {},
-  onTargetChange: () => {},
-  onGameOver: () => {}
-};
+console.log('--- 家庭訪問ウォーズ ゲームエンジン検証テスト ---');
 
-console.log('--- Testing Wave & Spawn Logic ---');
+let lastGameOverData = null;
+const mockUI = {
+  updateHUD: () => {},
+  onProblemChange: () => {},
+  onTargetChange: () => {},
+  onGameOver: (data) => {
+    lastGameOverData = data;
+  }
+};
 
 const canvas = new MockCanvas();
 const game = new TowerDefenseGame(canvas, mockUI);
 
-// 1. ウェーブ1の開始テスト
+// 1. 初期状態テスト
 game.start();
-assert.strictEqual(game.wave, 1, 'Wave should be 1');
-assert.strictEqual(game.monsters.length, 1, 'First monster should be spawned immediately');
-assert.ok(game.monstersToSpawn.length > 0, 'Remaining monsters should be in queue');
+assert.strictEqual(game.teacher.distance, 80.0, '初期距離は80.0mであること');
+assert.strictEqual(game.phase, 1, '初期段階は第1段階であること');
+assert.strictEqual(game.questionsCleared, 0, 'クリア問数は0問であること');
+assert.ok(game.getCurrentProblem(), '開始時に問題が生成されていること');
+console.log('✅ 1. 初期状態テスト通過（距離: 80.0m, Phase 1, 問題生成OK）');
 
-const initialSpawnQueueCount = game.monstersToSpawn.length;
-console.log(`Initial monsters on field: ${game.monsters.length}, queued: ${initialSpawnQueueCount}`);
+// 2. 正解によるノックバックとスコア・MP加算テスト
+const p1 = game.getCurrentProblem();
+const ans1 = p1.simplifiedResult;
+const initialDistance = game.teacher.distance;
 
-// 2. モンスター撃破時の即時（700ms以内）スポーンテスト
-const firstMonster = game.monsters[0];
-game.defeatMonster(firstMonster);
+const res1 = game.submitAnswer(ans1.num, ans1.den, ans1.whole || 0);
+assert.strictEqual(res1.status, 'correct', '正解判定が返ること');
+assert.ok(game.teacher.distance > initialDistance, '先生が押し返されて距離が増加すること');
+assert.strictEqual(game.questionsCleared, 1, 'クリア問数が1問に増加すること');
+assert.strictEqual(game.combo, 1, 'コンボ数が1になること');
+assert.strictEqual(game.mp, 15, 'MPが15加算されること');
+assert.ok(game.score > 0, 'スコアが加算されること');
+console.log(`✅ 2. 正解押し返しテスト通過（距離: ${initialDistance.toFixed(1)}m ➔ ${game.teacher.distance.toFixed(1)}m, MP: ${game.mp}）`);
 
-assert.strictEqual(game.monsters.length, 0, 'Field should be empty right after defeat');
-assert.ok(game.spawnTimer >= game.spawnInterval - 700, 'spawnTimer should jump to near spawnInterval');
+// 3. ミスによる怒り加速ペナルティテスト
+const beforeWrongDist = game.teacher.distance;
+const beforeSpeed = game.teacher.currentSpeed;
+const beforeAnger = game.teacher.angerMultiplier;
 
-// gameLoop の更新テスト (dt = 0.8s)
-game.lastTime = performance.now();
-game.gameLoop(performance.now() + 800);
+const resWrong = game.submitAnswer(999, 999, 0);
+assert.strictEqual(resWrong.status, 'wrong', '不正解判定が返ること');
+assert.ok(game.teacher.distance < beforeWrongDist, 'ミスにより先生が5m接近すること');
+assert.ok(game.teacher.angerMultiplier > beforeAnger, '先生の怒り倍率が増加すること');
+assert.ok(game.teacher.currentSpeed > beforeSpeed, '先生の移動スピードが上がること');
+assert.strictEqual(game.combo, 0, 'コンボが0にリセットされること');
+console.log(`✅ 3. ミスペナルティテスト通過（怒り倍率: ${beforeAnger.toFixed(2)} ➔ ${game.teacher.angerMultiplier.toFixed(2)}, 速度: ${beforeSpeed.toFixed(2)} ➔ ${game.teacher.currentSpeed.toFixed(2)}）`);
 
-// 画面が0体だったので、次のモンスターが即座にスポーンしているはず！
-assert.strictEqual(game.monsters.length, 1, 'Next monster should spawn rapidly when field was empty');
-console.log('✅ Monster defeat rapid spawn test passed!');
+// 4. 10問正解による段階進行（Phase 1 ➔ Phase 2）テスト
+for (let i = 0; i < 9; i++) {
+  const p = game.getCurrentProblem();
+  const a = p.simplifiedResult;
+  game.submitAnswer(a.num, a.den, a.whole || 0);
+}
+assert.strictEqual(game.questionsCleared, 10, '10問クリアしていること');
+assert.strictEqual(game.phase, 2, '第2段階に進行していること');
+assert.ok(game.teacher.baseSpeed > 1.0, '第2段階でベース速度が上がっていること');
+console.log(`✅ 4. 段階進行テスト通過（10問撃退 ➔ 第${game.phase}段階, ベース速度: ${game.teacher.baseSpeed}m/s）`);
 
-// 3. 城ダメージ時のウェーブクリア進行テスト（最後の敵が城に到達した場合）
-// 残りのスポーン待ちモンスターをすべて空にして、画面上の敵を1体だけにする
-game.monstersToSpawn = [];
-assert.strictEqual(game.monsters.length, 1, 'Exactly 1 monster on field');
+// 5. 必殺技テスト（お茶出しフリーズ & 宿題大嵐メテオ）
+game.mp = 100;
+const freezeSuccess = game.useSkillFreeze();
+assert.strictEqual(freezeSuccess, true, 'MP50消費でお茶出しが発動すること');
+assert.strictEqual(game.isFrozen, true, 'フリーズ状態になること');
+assert.strictEqual(game.mp, 50, 'MPが50になること');
 
-const lastMonster = game.monsters[0];
-let waveClearCalled = false;
-const originalOnWaveClear = game.onWaveClear.bind(game);
-game.onWaveClear = () => {
-  waveClearCalled = true;
-  originalOnWaveClear();
-};
+game.mp = 100;
+game.teacher.distance = 50.0;
+const beforeMeteorDist = game.teacher.distance;
+const meteorSuccess = game.useSkillMeteor();
+assert.strictEqual(meteorSuccess, true, 'MP100消費で宿題大嵐が発動すること');
+assert.strictEqual(game.teacher.distance, 75.0, '宿題大嵐で正確に+25mノックバックすること');
+console.log('✅ 5. 必殺技テスト通過（🍵お茶出し足止め & 📄宿題大嵐超ノックバック）');
 
-// 城に到達！
-game.onCastleDamage(lastMonster);
+// 6. 玄関突破ゲームオーバーテスト
+game.isFrozen = false;
+game.teacher.knockbackTimer = 0;
+game.teacher.distance = 0.5;
+game.update(1.0); // 1秒経過で距離0以下へ突入
+assert.strictEqual(game.isGameOver, true, '距離0以下でゲームオーバーになること');
+assert.ok(lastGameOverData, 'onGameOverコールバックが呼ばれること');
+assert.ok(lastGameOverData.history.length > 0, '復習ノートの履歴が記録されていること');
+console.log('✅ 6. 玄関突破ゲームオーバーテスト通過（🚪 家庭訪問突入 & 復習履歴保存OK）');
 
-assert.strictEqual(game.monsters.length, 0, 'No monsters on field');
-assert.strictEqual(game.lives, 2, 'Life reduced by 1');
-assert.strictEqual(waveClearCalled, true, 'onWaveClear MUST be called even if last monster breaches the castle!');
-console.log('✅ Castle breach wave progression test passed!');
+// 7. 5分以内アウト難易度カーブ検証（シミュレーション）
+console.log('\n--- 5分以内アウト精密シミュレーション検証 ---');
+const simGame = new TowerDefenseGame(canvas, mockUI);
+simGame.start();
 
-// 4. 次のウェーブ（Wave 2）が自動開始されて敵が出るかのテスト
-// onWaveClear 内の setTimeout (2800ms) をシミュレート
-assert.strictEqual(game.isWaveClear, true, 'isWaveClear flag set');
-// 2800ms 経過後のタイマー実行を手動でトリガー
-game.wave++;
-game.prepareWave(game.wave);
+let simTime = 0;
+const dt = 0.05;
+let nextAnswerTime = 6.5; // 計算最速（6.5秒/問、ノーミス）
 
-assert.strictEqual(game.wave, 2, 'Should advance to Wave 2');
-assert.strictEqual(game.isWaveClear, false, 'isWaveClear reset');
-assert.strictEqual(game.monsters.length, 1, 'First monster of Wave 2 spawned');
-assert.ok(game.monstersToSpawn.length > 0, 'Wave 2 monsters in queue');
-console.log('✅ Wave 2 advance and spawn test passed!');
+while (!simGame.isGameOver && simTime < 600) {
+  simTime += dt;
+  simGame.update(dt);
 
-console.log('\nAll spawn & wave progression tests passed successfully! 🎉');
+  if (simTime >= nextAnswerTime) {
+    const p = simGame.getCurrentProblem();
+    const a = p.simplifiedResult;
+    simGame.submitAnswer(a.num, a.den, a.whole || 0);
+    nextAnswerTime += 6.5;
+  }
+}
+
+const min = Math.floor(simTime / 60);
+const sec = Math.round(simTime % 60);
+console.log(`トップ層（6.5秒/問 ノーミス）の生存時間: ${min}分${sec}秒（${simTime.toFixed(1)}秒, ${simGame.questionsCleared}問撃退）`);
+assert.ok(simTime <= 300, '計算最速プレイヤーでも5分（300秒）以内にアウトになること！');
+assert.ok(simTime >= 200, '理不尽に速すぎず3分半以上は粘れること！');
+console.log('✅ 7. 難易度カーブ検証通過（目標の5分以内アウトを精密に達成！）');
+
+console.log('\n🎉 全てのテストが完璧に通過しました！');

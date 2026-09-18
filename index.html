@@ -3,23 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>分数まどうタワーディフェンス 〜すうじの王国をまもれ！〜</title>
+  <title>家庭訪問ウォーズ 〜迫りくるワタナベ先生を分数魔法で押し返せ！〜</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-2 sm:p-4 flex flex-col items-center justify-center">
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans select-none overflow-x-hidden">
 
-  <div class="app-layout w-full max-w-[1400px] bg-slate-800 rounded-2xl shadow-2xl border-2 border-slate-700 overflow-hidden flex flex-col">
+  <div id="gameContainer" class="flex flex-col flex-1 w-full max-w-7xl mx-auto shadow-2xl bg-slate-900 border-x border-slate-700">
     <!-- 最上部 共通ステータスバー -->
     <header class="top-hud bg-slate-950 px-4 py-2.5 flex items-center justify-between border-b border-slate-700 flex-wrap gap-2">
       <div class="flex items-center gap-4 flex-wrap">
-        <h1 class="font-extrabold text-sm sm:text-base text-indigo-400 flex items-center gap-1.5">
-          🏰 <span>分数防衛隊</span>
+        <h1 class="font-extrabold text-sm sm:text-base text-amber-400 flex items-center gap-1.5">
+          🏃‍♂️ <span>家庭訪問ウォーズ</span>
         </h1>
         <div class="hud-item flex items-center gap-1">
-          <span class="text-xs text-slate-400">ライフ:</span>
-          <span id="livesDisplay" class="text-lg tracking-widest">❤️❤️❤️</span>
+          <span class="text-xs text-slate-400">🚪 玄関まで:</span>
+          <span id="distanceDisplay" class="font-mono font-black text-rose-400 text-base">80.0m</span>
         </div>
         <div class="hud-item flex items-center gap-1">
           <span class="text-xs text-slate-400">スコア:</span>
@@ -30,7 +30,7 @@
           <span id="highScoreDisplay" class="font-mono font-black text-emerald-400 text-base">0</span>
         </div>
         <div class="hud-item">
-          <span id="waveDisplay" class="bg-indigo-900/80 border border-indigo-500 text-indigo-200 text-xs px-2.5 py-0.5 rounded-full font-bold">ウェーブ 1</span>
+          <span id="waveDisplay" class="bg-indigo-900/80 border border-indigo-500 text-indigo-200 text-xs px-2.5 py-0.5 rounded-full font-bold">第1段階 (0問)</span>
         </div>
         <div id="comboBadge" class="combo-badge hidden text-xs bg-gradient-to-r from-amber-500 to-rose-500 text-white font-black px-2.5 py-0.5 rounded-full">
           🔥 <span id="comboText">2 連続せいかい！</span>
@@ -49,8 +49,8 @@
 
         <!-- 必殺技キーガイド -->
         <div class="hidden md:flex items-center gap-1.5 text-xs">
-          <span id="freezeSkillBadge" class="px-2 py-0.5 rounded bg-sky-950 border border-sky-600 text-sky-300 font-bold opacity-50" title="キーボードの [F] キーで発動">❄️[F]停止(MP50)</span>
-          <span id="meteorSkillBadge" class="px-2 py-0.5 rounded bg-orange-950 border border-orange-600 text-orange-300 font-bold opacity-50" title="キーボードの [M] キーで発動">🔥[M]メテオ(MP100)</span>
+          <span id="freezeSkillBadge" class="px-2 py-0.5 rounded bg-sky-950 border border-sky-600 text-sky-300 font-bold opacity-50" title="キーボードの [F] キーで発動">🍵[F]お茶出し(MP50)</span>
+          <span id="meteorSkillBadge" class="px-2 py-0.5 rounded bg-orange-950 border border-orange-600 text-orange-300 font-bold opacity-50" title="キーボードの [M] キーで発動">📄[M]宿題大嵐(MP100)</span>
         </div>
 
         <!-- ガイドボタン -->
@@ -211,7 +211,7 @@
   <div id="gameOverModal" class="modal-overlay modal-above hidden">
     <div class="modal-card max-w-xl bg-slate-800 text-slate-100 border border-slate-600 rounded-2xl overflow-hidden shadow-2xl">
       <div class="modal-header bg-rose-950 p-3 flex items-center justify-between border-b border-rose-800">
-        <h3 class="modal-title font-black text-rose-400">🏰 城が破られた... ゲームオーバー</h3>
+        <h3 class="modal-title font-black text-rose-400">🚪 ガチャッ！ 家庭訪問が始まってしまった…！</h3>
       </div>
       <div class="modal-body p-4 flex flex-col gap-4">
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
@@ -224,8 +224,8 @@
             <div id="finalHighScoreDisplay" class="text-lg font-black text-amber-400">0</div>
           </div>
           <div class="bg-slate-900 p-2.5 rounded-xl border border-slate-700">
-            <div class="text-[11px] text-slate-400 font-bold">到達ウェーブ</div>
-            <div id="finalWaveDisplay" class="text-lg font-black text-slate-200">1</div>
+            <div class="text-[11px] text-slate-400 font-bold">到達段階</div>
+            <div id="finalWaveDisplay" class="text-lg font-black text-slate-200">第1段階</div>
           </div>
           <div class="bg-slate-900 p-2.5 rounded-xl border border-slate-700">
             <div class="text-[11px] text-slate-400 font-bold">最大コンボ</div>
@@ -233,8 +233,9 @@
           </div>
         </div>
 
-        <div class="text-center text-xs text-slate-400">
-          撃破したモンスター総数: <span id="finalDefeatedDisplay" class="font-bold text-slate-200">0 体</span>
+        <div class="text-center text-xs text-slate-300 bg-slate-900/60 py-2 px-3 rounded-xl border border-slate-800 flex items-center justify-around">
+          <div>⏱️ 耐え抜いた時間: <span id="finalTimeDisplay" class="font-bold text-emerald-400">0分00秒</span></div>
+          <div>💨 押し返した回数: <span id="finalDefeatedDisplay" class="font-bold text-amber-300">0 問</span></div>
         </div>
 
         <div>
@@ -319,20 +320,21 @@
     <div class="modal-card max-w-lg bg-slate-900/95 text-slate-100 border-2 border-indigo-500/70 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col items-center text-center gap-6 backdrop-blur-md">
       <!-- タイトルロゴ -->
       <div class="space-y-2">
-        <div class="text-4xl sm:text-5xl animate-bounce">🏰🧙‍♂️✨</div>
-        <h2 class="text-2xl sm:text-3xl font-black bg-gradient-to-r from-indigo-300 via-sky-300 to-amber-300 bg-clip-text text-transparent">
-          分数まどうタワーディフェンス
+        <div class="text-4xl sm:text-5xl animate-bounce">🏃‍♂️💨🚪✨</div>
+        <h2 class="text-2xl sm:text-3xl font-black bg-gradient-to-r from-amber-300 via-rose-300 to-sky-300 bg-clip-text text-transparent">
+          家庭訪問ウォーズ
         </h2>
-        <p class="text-xs sm:text-sm text-indigo-300 font-bold tracking-wide">〜 すうじの王国をまもれ！ 〜</p>
+        <p class="text-xs sm:text-sm text-indigo-300 font-bold tracking-wide">〜 迫りくるワタナベ先生を分数魔法で押し返せ！ 〜</p>
       </div>
 
       <!-- 簡単な説明 -->
-      <div class="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700 text-xs text-slate-300 text-left space-y-1.5 w-full">
-        <p class="font-bold text-indigo-300 flex items-center gap-1">🎮 あそびかた:</p>
-        <ul class="list-disc list-inside space-y-1 text-[11px] text-slate-300">
-          <li>せまるモンスターの<strong>分数の足し算・引き算（通分）</strong>を計算しよう！</li>
-          <li>数字を入力して <strong>[Enter]</strong> で魔法弾こうげき！</li>
-          <li>右側の<strong>けいさんスペース</strong>で手書きのメモやひっ算ができるよ！</li>
+      <div class="bg-slate-800/80 p-3.5 rounded-2xl border border-slate-700 text-xs text-slate-300 text-left space-y-2 w-full">
+        <p class="font-bold text-amber-300 flex items-center gap-1">🎮 あそびかた:</p>
+        <ul class="list-disc list-inside space-y-1.5 text-[11px] text-slate-300">
+          <li>迫りくる担任の先生の<strong>分数の足し算・引き算（通分）</strong>を計算しよう！</li>
+          <li>正解すると強力な魔法で<strong>先生をどんどん押し返す！</strong></li>
+          <li>間違えると<strong>先生が怒ってスピードUP！</strong> 10問解くごとにどんどん早足に！</li>
+          <li>玄関ドアを突破される前に、限界まで押し返し続けよう！</li>
         </ul>
       </div>
 
